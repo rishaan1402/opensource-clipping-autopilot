@@ -111,7 +111,7 @@ WHISPER_COMPUTE_TYPE = "float32"
 
 The **Clipping Studio** is a browser-based dashboard hosted for free on **GitHub Pages** that connects to a Kaggle/Colab notebook as its backend — giving you a full GUI to control the AI clipping pipeline without any local setup.
 
-**🔗 Open Studio:** [naufalrizqullah.github.io/opensource-clipping/studio/](https://naufalrizqullah.github.io/opensource-clipping/studio/)
+**🔗 Open Studio:** 
 
 ### How It Works
 
