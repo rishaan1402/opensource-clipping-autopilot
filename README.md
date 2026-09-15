@@ -11,8 +11,7 @@
     An open-source content factory that transforms long-form videos into cinematic short-form highlights with hook teasers, karaoke subtitles, and auto-thumbnails.
     <br />
     <br />
-    <a href="README_ID.md">🇮🇩 Baca dalam Bahasa Indonesia</a>
-    &middot;
+    
     <a href="https://github.com/NaufalRizqullah/opensource-clipping/issues/new">Report Bug</a>
     &middot;
     <a href="https://github.com/NaufalRizqullah/opensource-clipping/issues/new">Request Feature</a>
@@ -112,7 +111,7 @@ WHISPER_COMPUTE_TYPE = "float32"
 
 The **Clipping Studio** is a browser-based dashboard hosted for free on **GitHub Pages** that connects to a Kaggle/Colab notebook as its backend — giving you a full GUI to control the AI clipping pipeline without any local setup.
 
-**🔗 Open Studio:** [naufalrizqullah.github.io/opensource-clipping/studio/](https://naufalrizqullah.github.io/opensource-clipping/studio/)
+**🔗 Open Studio:** 
 
 ### How It Works
 
@@ -692,12 +691,7 @@ We provide a simple bash script to safely clean up all temporary files while pre
 bash cleanup.sh
 ```
 
-## ❤️ Support & Contributing
 
-Feel free for contributing, support, fork, likes, etc. Any feedback is greatly appreciated to keep this open-source project growing!
-
-- **Saweria:** [https://saweria.co/NaufalRizqullah17](https://saweria.co/NaufalRizqullah17)
-- **Ko-fi:** [https://ko-fi.com/naufalrizqullah](https://ko-fi.com/naufalrizqullah)
 
 ## 📄 License
 
