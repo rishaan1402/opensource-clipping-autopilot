@@ -692,12 +692,7 @@ We provide a simple bash script to safely clean up all temporary files while pre
 bash cleanup.sh
 ```
 
-## ❤️ Support & Contributing
 
-Feel free for contributing, support, fork, likes, etc. Any feedback is greatly appreciated to keep this open-source project growing!
-
-- **Saweria:** [https://saweria.co/NaufalRizqullah17](https://saweria.co/NaufalRizqullah17)
-- **Ko-fi:** [https://ko-fi.com/naufalrizqullah](https://ko-fi.com/naufalrizqullah)
 
 ## 📄 License
 
