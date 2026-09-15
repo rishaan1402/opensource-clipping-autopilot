@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Job — OSC Studio</title>
+    <meta name="description" content="Create a new AI auto-clipping job — OpenSource Clipping Studio">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'], display: ['Outfit', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 400: '#a78bfa', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="studio.css">
+    <script>if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');</script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans transition-colors duration-300">
+
+    <div id="mobile-overlay" class="mobile-overlay hidden" onclick="closeSidebar()"></div>
+
+    <div class="studio-layout">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="studio-sidebar">
+            <div class="sidebar-brand">
+                <a href="../index.html" class="flex items-center gap-2 group mb-2">
+                    <div class="p-1.5 rounded-lg bg-brand-600 text-white group-hover:scale-105 transition-transform shadow-md shadow-brand-500/20">
+                        <i data-lucide="scissors" class="w-4 h-4"></i>
+                    </div>
+                    <span class="font-display font-bold text-sm bg-gradient-to-r from-brand-600 to-indigo-500 dark:from-brand-400 dark:to-sky-400 bg-clip-text text-transparent">
+                        Opensource Clipping
+                    </span>
+                </a>
+                <h2 class="font-display font-bold text-lg text-slate-900 dark:text-white">🎬 Studio</h2>
+                <p class="text-xs text-slate-400 dark:text-slate-500">AI Auto-Clipper · Remote GPU</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="sidebar-link"><i data-lucide="layout-dashboard" class="nav-icon"></i> Dashboard</a>
+                <a href="new-job.html" class="sidebar-link active"><i data-lucide="plus-circle" class="nav-icon"></i> New Job</a>
+                <a href="settings.html" class="sidebar-link"><i data-lucide="settings" class="nav-icon"></i> Settings</a>
+            </nav>
+            <div class="connect-panel">
+                <div class="flex items-center gap-2 mb-2">
+                    <span id="connect-dot" class="connect-dot offline"></span>
+                    <span id="connect-label" class="text-xs text-slate-500 dark:text-slate-400 truncate flex-1">Not connected</span>
+                </div>
+                <div class="flex gap-2 w-full">
+                    <button id="connect-btn" onclick="showConnectModal()" class="flex-1 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300">
+                        Connect
+                    </button>
+                    <button id="sidebar-stop-btn" onclick="stopBackendServer()" class="hidden w-10 flex items-center justify-center text-xs font-medium rounded-lg border border-red-500 bg-red-600 hover:bg-red-700 text-white transition-colors" title="Stop Kaggle Server">
+                        <i data-lucide="power" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+                <button onclick="toggleTheme()" class="w-full mt-2 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2">
+                    <span class="dark:hidden"><i data-lucide="moon" class="w-3.5 h-3.5"></i></span>
+                    <span class="hidden dark:inline"><i data-lucide="sun" class="w-3.5 h-3.5"></i></span>
+                    <span class="dark:hidden">Dark Mode</span><span class="hidden dark:inline">Light Mode</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="studio-main">
+            <div class="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 h-14 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80">
+                <button onclick="toggleSidebar()" class="mobile-toggle p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="menu" class="w-5 h-5"></i></button>
+                <span class="font-display font-bold text-sm">🎬 New Job</span>
+            </div>
+
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 fade-in">
+                <!-- Page Header -->
+                <div class="mb-8">
+                    <h1 class="font-display font-bold text-2xl sm:text-3xl text-slate-900 dark:text-white">New Clipping Job</h1>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Generate viral short clips dari video panjang</p>
+                </div>
+
+                <form id="new-job-form" onsubmit="handleSubmit(event)">
+
+                    <!-- Video Source -->
+                    <div class="glass-card p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm mb-6">
+                        <h3 class="font-display font-semibold text-base text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                            <i data-lucide="download" class="w-5 h-5 text-brand-500"></i>
+                            Video Source
+                        </h3>
+
+                        <!-- Mode Toggle -->
+                        <div class="flex gap-2 mb-5">
+                            <button type="button" onclick="setMode('url')" id="mode-url-btn" class="px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md">🔗 From URL</button>
+                            <button type="button" onclick="setMode('reuse')" id="mode-reuse-btn" class="px-4 py-2 rounded-lg text-xs font-semibold transition-all border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">🔁 Reuse Job</button>
+                        </div>
+
+                        <!-- URL Mode -->
+                        <div id="mode-url-panel">
+                            <div class="mb-4">
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Video URL</label>
+                                <input id="input-url" type="url" placeholder="https://www.youtube.com/watch?v=..."
+                                    class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 placeholder-slate-400 text-slate-900 dark:text-white">
+                                <p class="text-xs text-slate-400 mt-1.5">Mendukung YouTube, TikTok, Instagram, Google Drive</p>
+                            </div>
+                            <div class="max-w-[200px]">
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Platform</label>
+                                <select id="input-source" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-900 dark:text-white">
+                                    <option value="youtube">YouTube</option>
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="instagram">Instagram</option>
+                                    <option value="gdrive">Google Drive</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Reuse Mode -->
+                        <div id="mode-reuse-panel" class="hidden">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Reuse Job ID</label>
+                                <input id="input-reuse-id" type="text" placeholder="Contoh: d20b47341e08"
+                                    class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 placeholder-slate-400 text-slate-900 dark:text-white">
+                                <p class="text-xs text-slate-400 mt-1.5">Bypass download dengan job ID lama.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Config Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
+
+                        <!-- Basic Settings -->
+                        <div class="glass-card p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+                            <h4 class="font-semibold text-sm text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <i data-lucide="target" class="w-4 h-4 text-brand-500"></i> Basic Settings
+                            </h4>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Number of Clips</label>
+                                    <input id="input-clips" type="number" min="1" max="30" value="7"
+                                        class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-900 dark:text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Aspect Ratio</label>
+                                    <select id="input-ratio" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-900 dark:text-white">
+                                        <option value="9:16">9:16 (Vertical — Reels)</option>
+                                        <option value="16:9">16:9 (Horizontal)</option>
+                                        <option value="1:1">1:1 (Square)</option>
+                                        <option value="3:4">3:4</option>
+                                        <option value="4:5">4:5</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Font Style</label>
+                                    <select id="input-font" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-900 dark:text-white">
+                                        <option value="HORMOZI">Hormozi (Bold)</option>
+                                        <option value="DEFAULT">Default (Montserrat)</option>
+                                        <option value="STORYTELLER">Storyteller (Inter)</option>
+                                        <option value="CINEMATIC">Cinematic (Bebas Neue)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI Settings -->
+                        <div class="glass-card p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+                            <h4 class="font-semibold text-sm text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <i data-lucide="brain" class="w-4 h-4 text-brand-500"></i> AI & Whisper
+                            </h4>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">AI Provider</label>
+                                    <select id="input-ai" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-900 dark:text-white">
+                                        <option value="gemini">Google Gemini</option>
+                                        <option value="nvidia">NVIDIA NIM</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Whisper Model</label>
+                                    <select id="input-whisper" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-900 dark:text-white">
+                                        <option value="large-v3">large-v3 (Best quality)</option>
+                                        <option value="medium">medium (Balanced)</option>
+                                        <option value="small">small (Fast)</option>
+                                        <option value="base">base (Fastest)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">Device</label>
+                                    <select id="input-device" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-slate-900 dark:text-white">
+                                        <option value="cuda">CUDA (GPU)</option>
+                                        <option value="cpu">CPU</option>
+                                        <option value="auto">Auto</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Feature Toggles -->
+                        <div class="glass-card p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+                            <h4 class="font-semibold text-sm text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <i data-lucide="sparkles" class="w-4 h-4 text-brand-500"></i> Features
+                            </h4>
+                            <div id="toggles-container"></div>
+                        </div>
+                    </div>
+
+                    <!-- Error -->
+                    <div id="form-error" class="hidden mb-4 p-3.5 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 flex-shrink-0"></i>
+                        <span id="form-error-text"></span>
+                    </div>
+
+                    <!-- Submit -->
+                    <button id="submit-btn" type="submit" class="px-7 py-3 rounded-xl bg-brand-600 text-white font-semibold text-sm hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/20 hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none">
+                        <i data-lucide="rocket" class="w-4 h-4"></i>
+                        Start Clipping
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="api.js"></script>
+    <script>
+        lucide.createIcons();
+
+        let currentMode = 'url';
+
+        // Feature toggles config
+        const TOGGLES = [
+            { id: 'use_broll', label: 'B-Roll Footage', desc: 'Insert stock footage', default: true },
+            { id: 'use_hook_glitch', label: 'Hook Glitch', desc: 'Glitch transition intro', default: true },
+            { id: 'use_auto_bgm', label: 'Background Music', desc: 'Auto BGM matching', default: true },
+            { id: 'use_karaoke_effect', label: 'Karaoke Effect', desc: 'Word-by-word highlight', default: true },
+            { id: 'hook_v2', label: 'Hook V2', desc: 'Multi-hook intro clips', default: false },
+            { id: 'silence_trim', label: 'Silence Trim', desc: 'Remove dead air', default: false },
+            { id: 'use_dlp_subs', label: 'YouTube Subs', desc: 'Skip Whisper if available', default: false },
+            { id: 'no_subs', label: 'No Subtitles', desc: 'Render without text', default: false },
+            { id: 'load_gemini_json', label: 'Bypass AI', desc: 'Reuse gemini JSON', default: false },
+        ];
+
+        // Render toggles
+        const togglesContainer = document.getElementById('toggles-container');
+        togglesContainer.innerHTML = TOGGLES.map(t => `
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">${t.label}</div>
+                    <div class="toggle-desc">${t.desc}</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-${t.id}" ${t.default ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        `).join('');
+
+        function setMode(mode) {
+            currentMode = mode;
+            const urlBtn = document.getElementById('mode-url-btn');
+            const reuseBtn = document.getElementById('mode-reuse-btn');
+            const urlPanel = document.getElementById('mode-url-panel');
+            const reusePanel = document.getElementById('mode-reuse-panel');
+
+            const activeClass = 'bg-brand-600 text-white shadow-md';
+            const inactiveClass = 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800';
+
+            urlBtn.className = `px-4 py-2 rounded-lg text-xs font-semibold transition-all ${mode === 'url' ? activeClass : inactiveClass}`;
+            reuseBtn.className = `px-4 py-2 rounded-lg text-xs font-semibold transition-all ${mode === 'reuse' ? activeClass : inactiveClass}`;
+
+            urlPanel.classList.toggle('hidden', mode !== 'url');
+            reusePanel.classList.toggle('hidden', mode !== 'reuse');
+        }
+
+        async function handleSubmit(e) {
+            e.preventDefault();
+
+            const errorEl = document.getElementById('form-error');
+            const errorText = document.getElementById('form-error-text');
+            const btn = document.getElementById('submit-btn');
+
+            errorEl.classList.add('hidden');
+
+            if (!StudioAPI.isConfigured()) {
+                errorText.textContent = 'Backend not connected. Click "Connect" in the sidebar first.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            // Validation
+            if (currentMode === 'url' && !document.getElementById('input-url').value.trim()) {
+                errorText.textContent = 'URL tidak boleh kosong';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            if (currentMode === 'reuse' && !document.getElementById('input-reuse-id').value.trim()) {
+                errorText.textContent = 'Job ID tidak boleh kosong';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Processing...';
+
+            try {
+                const payload = {
+                    source: document.getElementById('input-source').value,
+                    clips: parseInt(document.getElementById('input-clips').value) || 7,
+                    ratio: document.getElementById('input-ratio').value,
+                    font_style: document.getElementById('input-font').value,
+                    whisper_model: document.getElementById('input-whisper').value,
+                    whisper_device: document.getElementById('input-device').value,
+                    ai_provider: document.getElementById('input-ai').value,
+                };
+
+                if (currentMode === 'url') {
+                    payload.url = document.getElementById('input-url').value.trim();
+                } else if (currentMode === 'reuse') {
+                    payload.reuse_job_id = document.getElementById('input-reuse-id').value.trim();
+                }
+
+                // Add toggles
+                TOGGLES.forEach(t => {
+                    payload[t.id] = document.getElementById(`toggle-${t.id}`).checked;
+                });
+
+                const job = await StudioAPI.createJob(payload);
+                window.location.href = `job.html?id=${job.id}`;
+            } catch (err) {
+                errorText.textContent = err.message;
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="rocket" class="w-4 h-4"></i> Start Clipping';
+                lucide.createIcons();
+            }
+        }
+    </script>
+</body>
+
+</html>

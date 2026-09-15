@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="184" height="28" viewBox="0 0 184 28" role="img" aria-label="Opensource Clipping">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@700&amp;display=swap');
+    .logo-text {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+  </style>
+
+  <defs>
+    <linearGradient id="textGradient" x1="0" y1="0" x2="184" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+  <text class="logo-text" x="0" y="21" fill="url(#textGradient)">Opensource Clipping</text>
+</svg>

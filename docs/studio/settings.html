@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — OSC Studio</title>
+    <meta name="description" content="Configure API keys and settings — OpenSource Clipping Studio">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'], display: ['Outfit', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 400: '#a78bfa', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="studio.css">
+    <script>if (localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');</script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans transition-colors duration-300">
+
+    <div id="mobile-overlay" class="mobile-overlay hidden" onclick="closeSidebar()"></div>
+
+    <div class="studio-layout">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="studio-sidebar">
+            <div class="sidebar-brand">
+                <a href="../index.html" class="flex items-center gap-2 group mb-2">
+                    <div class="p-1.5 rounded-lg bg-brand-600 text-white group-hover:scale-105 transition-transform shadow-md shadow-brand-500/20">
+                        <i data-lucide="scissors" class="w-4 h-4"></i>
+                    </div>
+                    <span class="font-display font-bold text-sm bg-gradient-to-r from-brand-600 to-indigo-500 dark:from-brand-400 dark:to-sky-400 bg-clip-text text-transparent">
+                        Opensource Clipping
+                    </span>
+                </a>
+                <h2 class="font-display font-bold text-lg text-slate-900 dark:text-white">🎬 Studio</h2>
+                <p class="text-xs text-slate-400 dark:text-slate-500">AI Auto-Clipper · Remote GPU</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="sidebar-link"><i data-lucide="layout-dashboard" class="nav-icon"></i> Dashboard</a>
+                <a href="new-job.html" class="sidebar-link"><i data-lucide="plus-circle" class="nav-icon"></i> New Job</a>
+                <a href="settings.html" class="sidebar-link active"><i data-lucide="settings" class="nav-icon"></i> Settings</a>
+            </nav>
+            <div class="connect-panel">
+                <div class="flex items-center gap-2 mb-2">
+                    <span id="connect-dot" class="connect-dot offline"></span>
+                    <span id="connect-label" class="text-xs text-slate-500 dark:text-slate-400 truncate flex-1">Not connected</span>
+                </div>
+                <div class="flex gap-2 w-full">
+                    <button id="connect-btn" onclick="showConnectModal()" class="flex-1 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300">
+                        Connect
+                    </button>
+                    <button id="sidebar-stop-btn" onclick="stopBackendServer()" class="hidden w-10 flex items-center justify-center text-xs font-medium rounded-lg border border-red-500 bg-red-600 hover:bg-red-700 text-white transition-colors" title="Stop Kaggle Server">
+                        <i data-lucide="power" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+                <button onclick="toggleTheme()" class="w-full mt-2 text-xs font-medium px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2">
+                    <span class="dark:hidden"><i data-lucide="moon" class="w-3.5 h-3.5"></i></span>
+                    <span class="hidden dark:inline"><i data-lucide="sun" class="w-3.5 h-3.5"></i></span>
+                    <span class="dark:hidden">Dark Mode</span><span class="hidden dark:inline">Light Mode</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="studio-main">
+            <div class="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 h-14 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80">
+                <button onclick="toggleSidebar()" class="mobile-toggle p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"><i data-lucide="menu" class="w-5 h-5"></i></button>
+                <span class="font-display font-bold text-sm">⚙️ Settings</span>
+            </div>
+
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 fade-in">
+                <!-- Page Header -->
+                <div class="mb-8">
+                    <h1 class="font-display font-bold text-2xl sm:text-3xl text-slate-900 dark:text-white">Settings</h1>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Konfigurasi API keys dan default settings</p>
+                </div>
+
+                <!-- Loading -->
+                <div id="settings-loading" class="text-center py-16">
+                    <div class="spinner spinner-dark mx-auto mb-3"></div>
+                    <p class="text-sm text-slate-400">Loading settings...</p>
+                </div>
+
+                <!-- Settings Form -->
+                <form id="settings-form" class="hidden" onsubmit="handleSave(event)">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+                        <!-- API Keys -->
+                        <div class="glass-card p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+                            <h3 class="font-display font-semibold text-base text-slate-900 dark:text-white mb-5 flex items-center gap-2">
+                                <i data-lucide="key-round" class="w-5 h-5 text-brand-500"></i> API Keys
+                            </h3>
+
+                            <div class="space-y-5">
+                                <!-- Google Gemini -->
+                                <div>
+                                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                                        Google Gemini API Key
+                                        <span id="google-badge" class="hidden text-emerald-500 text-[10px] font-bold">✅ SET</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input id="input-google-key" type="password" placeholder="Paste your Gemini API key"
+                                            class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 placeholder-slate-400 text-slate-900 dark:text-white pr-10">
+                                        <button type="button" onclick="togglePasswordVisibility('input-google-key', this)"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1" title="Toggle visibility">
+                                            👁️
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-1">
+                                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Get free key →</a>
+                                    </p>
+                                </div>
+
+                                <!-- Pexels -->
+                                <div>
+                                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                                        Pexels API Key
+                                        <span id="pexels-badge" class="hidden text-emerald-500 text-[10px] font-bold">✅ SET</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input id="input-pexels-key" type="password" placeholder="For B-roll footage (optional)"
+                                            class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 placeholder-slate-400 text-slate-900 dark:text-white pr-10">
+                                        <button type="button" onclick="togglePasswordVisibility('input-pexels-key', this)"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1" title="Toggle visibility">
+                                            👁️
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-1">Required for B-roll stock footage</p>
+                                </div>
+
+                                <!-- HuggingFace -->
+                                <div>
+                                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                                        HuggingFace Token
+                                        <span id="hf-badge" class="hidden text-emerald-500 text-[10px] font-bold">✅ SET</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input id="input-hf-token" type="password" placeholder="For split-screen mode (optional)"
+                                            class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 placeholder-slate-400 text-slate-900 dark:text-white pr-10">
+                                        <button type="button" onclick="togglePasswordVisibility('input-hf-token', this)"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1" title="Toggle visibility">
+                                            👁️
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-1">Required for speaker diarization</p>
+                                </div>
+
+                                <!-- NVIDIA -->
+                                <div>
+                                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                                        NVIDIA API Key
+                                        <span id="nvidia-badge" class="hidden text-emerald-500 text-[10px] font-bold">✅ SET</span>
+                                    </label>
+                                    <div class="relative">
+                                        <input id="input-nvidia-key" type="password" placeholder="For NVIDIA NIM provider (optional)"
+                                            class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/60 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 placeholder-slate-400 text-slate-900 dark:text-white pr-10">
+                                        <button type="button" onclick="togglePasswordVisibility('input-nvidia-key', this)"
+                                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1" title="Toggle visibility">
+                                            👁️
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- System Info -->
+                        <div class="glass-card p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+                            <h3 class="font-display font-semibold text-base text-slate-900 dark:text-white mb-5 flex items-center gap-2">
+                                <i data-lucide="monitor" class="w-5 h-5 text-brand-500"></i> System Info
+                            </h3>
+
+                            <div class="space-y-4" id="system-info">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-500 dark:text-slate-400">GPU</span>
+                                    <span id="sys-gpu" class="text-slate-400">—</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-500 dark:text-slate-400">Default Whisper</span>
+                                    <span id="sys-whisper" class="text-slate-900 dark:text-white">—</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-500 dark:text-slate-400">Default AI</span>
+                                    <span id="sys-ai" class="text-slate-900 dark:text-white">—</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-500 dark:text-slate-400">Default Ratio</span>
+                                    <span id="sys-ratio" class="text-slate-900 dark:text-white">—</span>
+                                </div>
+                            </div>
+
+                            <!-- Connection Info -->
+                            <div class="mt-6 pt-5 border-t border-slate-200/80 dark:border-slate-800/80">
+                                <h4 class="font-semibold text-sm text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                                    <i data-lucide="link" class="w-4 h-4 text-brand-500"></i> Connection
+                                </h4>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-slate-500 dark:text-slate-400">Backend URL</span>
+                                        <span id="sys-backend-url" class="text-xs font-mono text-slate-500 dark:text-slate-400 truncate max-w-[200px]">—</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-slate-500 dark:text-slate-400">Status</span>
+                                        <span id="sys-status" class="text-slate-400">—</span>
+                                    </div>
+                                </div>
+                                <button onclick="showConnectModal()" class="mt-4 w-full text-xs font-medium px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2">
+                                    <i data-lucide="plug" class="w-3.5 h-3.5"></i>
+                                    Change Connection
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Save message -->
+                    <div id="save-msg" class="hidden text-sm mb-4"></div>
+
+                    <!-- Save Button -->
+                    <button id="save-btn" type="submit" class="px-6 py-3 rounded-xl bg-brand-600 text-white font-semibold text-sm hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/20 hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        Save Settings
+                    </button>
+                </form>
+
+                <!-- Not Connected State -->
+                <div id="no-connection-state" class="hidden text-center py-16">
+                    <div class="text-5xl mb-4">🔌</div>
+                    <h3 class="font-display font-semibold text-lg text-slate-900 dark:text-white mb-2">Not Connected</h3>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm mx-auto">Connect to your Kaggle/Colab backend to configure settings.</p>
+                    <button onclick="showConnectModal()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 text-white font-medium text-sm hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20">
+                        <i data-lucide="plug" class="w-4 h-4"></i>
+                        Connect
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="api.js"></script>
+    <script>
+        lucide.createIcons();
+
+        function togglePasswordVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '👀';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        async function loadSettings() {
+            if (!StudioAPI.isConfigured()) {
+                document.getElementById('settings-loading').classList.add('hidden');
+                document.getElementById('no-connection-state').classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const settings = await StudioAPI.fetchSettings();
+
+                document.getElementById('settings-loading').classList.add('hidden');
+                document.getElementById('settings-form').classList.remove('hidden');
+
+                // Key badges
+                if (settings.google_api_key_set) document.getElementById('google-badge').classList.remove('hidden');
+                if (settings.pexels_api_key_set) document.getElementById('pexels-badge').classList.remove('hidden');
+                if (settings.hf_token_set) document.getElementById('hf-badge').classList.remove('hidden');
+                if (settings.nvidia_api_key_set) document.getElementById('nvidia-badge').classList.remove('hidden');
+
+                // System info
+                document.getElementById('sys-gpu').innerHTML = settings.gpu_available
+                    ? '<span class="text-emerald-500">✅ Available</span>'
+                    : '<span class="text-slate-400">⚪ Not available</span>';
+                document.getElementById('sys-whisper').textContent = settings.default_whisper_model || '—';
+                document.getElementById('sys-ai').textContent = settings.default_ai_provider || '—';
+                document.getElementById('sys-ratio').textContent = settings.default_ratio || '—';
+
+                // Connection info
+                document.getElementById('sys-backend-url').textContent = StudioAPI.getBackendUrl() || '—';
+                document.getElementById('sys-status').innerHTML = '<span class="text-emerald-500">🟢 Connected</span>';
+            } catch (err) {
+                document.getElementById('settings-loading').classList.add('hidden');
+                document.getElementById('settings-form').classList.remove('hidden');
+                document.getElementById('sys-status').innerHTML = `<span class="text-red-500">🔴 Error</span>`;
+            }
+        }
+
+        async function handleSave(e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('save-btn');
+            const msg = document.getElementById('save-msg');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Saving...';
+            msg.classList.add('hidden');
+
+            try {
+                const payload = {};
+                const googleKey = document.getElementById('input-google-key').value;
+                const pexelsKey = document.getElementById('input-pexels-key').value;
+                const hfToken = document.getElementById('input-hf-token').value;
+                const nvidiaKey = document.getElementById('input-nvidia-key').value;
+
+                if (googleKey) payload.google_api_key = googleKey;
+                if (pexelsKey) payload.pexels_api_key = pexelsKey;
+                if (hfToken) payload.hf_token = hfToken;
+                if (nvidiaKey) payload.nvidia_api_key = nvidiaKey;
+
+                if (Object.keys(payload).length === 0) {
+                    msg.className = 'text-sm mb-4 text-amber-500';
+                    msg.textContent = 'Tidak ada perubahan';
+                    msg.classList.remove('hidden');
+                    return;
+                }
+
+                await StudioAPI.updateSettings(payload);
+
+                // Clear inputs
+                document.getElementById('input-google-key').value = '';
+                document.getElementById('input-pexels-key').value = '';
+                document.getElementById('input-hf-token').value = '';
+                document.getElementById('input-nvidia-key').value = '';
+
+                msg.className = 'text-sm mb-4 text-emerald-500';
+                msg.textContent = '✅ Settings berhasil diperbarui!';
+                msg.classList.remove('hidden');
+
+                // Reload to show updated badges
+                setTimeout(() => loadSettings(), 500);
+            } catch (err) {
+                msg.className = 'text-sm mb-4 text-red-500';
+                msg.textContent = '❌ Gagal menyimpan: ' + err.message;
+                msg.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> Save Settings';
+                lucide.createIcons();
+            }
+        }
+
+        loadSettings();
+    </script>
+</body>
+
+</html>

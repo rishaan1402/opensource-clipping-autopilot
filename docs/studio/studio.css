@@ -1,0 +1,511 @@
+/* ============================================================
+   OpenSource Clipping Studio — Static Pages Design System
+   Complements Tailwind CDN for studio-specific components.
+   ============================================================ */
+
+/* --- Layout: Sidebar + Main --- */
+.studio-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.studio-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: transform 0.3s ease;
+}
+.dark .studio-sidebar {
+  background: rgba(10, 10, 20, 0.92);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.studio-main {
+  flex: 1;
+  margin-left: 260px;
+  min-height: 100vh;
+}
+
+/* --- Sidebar Components --- */
+.sidebar-brand {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+.dark .sidebar-brand {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+.dark .sidebar-link {
+  color: #94a3b8;
+}
+.sidebar-link:hover {
+  background: rgba(99, 102, 241, 0.06);
+  color: #4f46e5;
+}
+.dark .sidebar-link:hover {
+  background: rgba(139, 92, 246, 0.1);
+  color: #a78bfa;
+}
+.sidebar-link.active {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  font-weight: 600;
+}
+.dark .sidebar-link.active {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+.sidebar-link .nav-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* --- Connect Status Panel (Sidebar Footer) --- */
+.connect-panel {
+  padding: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+.dark .connect-panel {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.connect-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.connect-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+.connect-dot.offline {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+}
+
+/* --- Glass Card --- */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.dark .glass-card {
+  background: rgba(15, 23, 42, 0.65);
+}
+
+/* --- Toggle Switch --- */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+.dark .toggle-row {
+  border-color: rgba(255, 255, 255, 0.05);
+}
+.toggle-row:last-child {
+  border-bottom: none;
+}
+.toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+}
+.dark .toggle-label {
+  color: #e2e8f0;
+}
+.toggle-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 1px;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  background: #cbd5e1;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.dark .toggle-slider {
+  background: #334155;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: #6366f1;
+}
+.dark .toggle-switch input:checked + .toggle-slider {
+  background: #8b5cf6;
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+}
+
+/* --- Progress Bar --- */
+.progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  border-radius: 8px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+.dark .progress-bar-bg {
+  background: #1e293b;
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  transition: width 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* --- Progress Steps --- */
+.progress-steps {
+  display: flex;
+  gap: 4px;
+}
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.progress-step .step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+.dark .progress-step .step-dot {
+  background: #334155;
+}
+.progress-step.done .step-dot {
+  background: #10b981;
+}
+.progress-step.done {
+  color: #10b981;
+}
+.progress-step.active .step-dot {
+  background: #6366f1;
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+  animation: pulse-dot 1.5s ease infinite;
+}
+.progress-step.active {
+  color: #6366f1;
+  font-weight: 600;
+}
+.dark .progress-step.active {
+  color: #a78bfa;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+/* --- Status Badges --- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.badge-queued {
+  background: rgba(148, 163, 184, 0.15);
+  color: #64748b;
+}
+.badge-downloading, .badge-transcribing, .badge-analyzing {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+.badge-rendering {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+}
+.badge-completed {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+.badge-failed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.badge-cancelled {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+/* --- Job Card --- */
+.job-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.dark .job-card {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.job-card:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.08);
+  transform: translateY(-1px);
+}
+.dark .job-card:hover {
+  border-color: rgba(139, 92, 246, 0.25);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.1);
+}
+
+/* --- Clip Card (Results) --- */
+.clip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.clip-card {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+.dark .clip-card {
+  background: rgba(15, 23, 42, 0.5);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.clip-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+.clip-video {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: 320px;
+  object-fit: cover;
+  background: #0f172a;
+}
+
+/* --- Log Viewer --- */
+.log-viewer {
+  background: #0f172a;
+  color: #a7f3d0;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 16px;
+  border-radius: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.log-viewer div {
+  padding: 1px 0;
+}
+
+/* --- Stat Card Gradient --- */
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  margin-top: 4px;
+  background: linear-gradient(135deg, #6366f1, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* --- Spinner --- */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+.spinner-dark {
+  border-color: rgba(99, 102, 241, 0.2);
+  border-top-color: #6366f1;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- Animations --- */
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Mobile Sidebar Toggle --- */
+.mobile-toggle {
+  display: none;
+}
+
+/* --- Connect Modal --- */
+.connect-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.connect-modal {
+  width: 100%;
+  max-width: 480px;
+  margin: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: white;
+  padding: 24px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15);
+}
+.dark .connect-modal {
+  background: #1e1e2e;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .studio-sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+  }
+  .studio-sidebar.open {
+    transform: translateX(0);
+  }
+  .studio-main {
+    margin-left: 0;
+  }
+  .mobile-toggle {
+    display: flex;
+  }
+  .mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 35;
+  }
+  .progress-steps {
+    flex-wrap: wrap;
+  }
+  .clip-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Scrollbar (dark mode) --- */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
