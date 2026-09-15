@@ -11,8 +11,7 @@
     An open-source content factory that transforms long-form videos into cinematic short-form highlights with hook teasers, karaoke subtitles, and auto-thumbnails.
     <br />
     <br />
-    <a href="README_ID.md">🇮🇩 Baca dalam Bahasa Indonesia</a>
-    &middot;
+    
     <a href="https://github.com/NaufalRizqullah/opensource-clipping/issues/new">Report Bug</a>
     &middot;
     <a href="https://github.com/NaufalRizqullah/opensource-clipping/issues/new">Request Feature</a>
