@@ -53,7 +53,7 @@ from cc_supply_probe import fetch_video_details, _parse_iso8601_duration
 
 def find_new_candidates(
     api_key: str, trust_db_path: str, dedup_dir: str, min_duration: float, per_channel_sample: int = 50,
-    channel_poll_limit: Optional[int] = None,
+    channel_poll_limit: Optional[int] = None, max_duration: Optional[float] = None,
 ) -> list[dict]:
     """
     Returns new, license-re-verified, long-enough candidates from approved
@@ -113,6 +113,8 @@ def find_new_candidates(
             duration_s = _parse_iso8601_duration(duration_raw)
             if duration_s < min_duration:
                 continue
+            if max_duration is not None and duration_s > max_duration:
+                continue
             channel_candidates.append({
                 "video_id": item["id"],
                 "url": f"https://www.youtube.com/watch?v={item['id']}",
@@ -130,7 +132,10 @@ def find_new_candidates(
     return interleaved
 
 
-def find_backlog_candidates(trust_db_path: str, dedup_dir: str, probe_glob: str, min_duration: float) -> list[dict]:
+def find_backlog_candidates(
+    trust_db_path: str, dedup_dir: str, probe_glob: str, min_duration: float,
+    max_duration: Optional[float] = None,
+) -> list[dict]:
     """
     Sources candidates from previously-saved cc_supply_probe.py JSON output
     instead of live-polling channels' recent uploads.
@@ -164,6 +169,8 @@ def find_backlog_candidates(trust_db_path: str, dedup_dir: str, probe_glob: str,
                 if v["channel_id"] not in approved_ids:
                     continue
                 if v["duration_s"] < min_duration:
+                    continue
+                if max_duration is not None and v["duration_s"] > max_duration:
                     continue
                 if dedup.check_video_duplicate(InputSource(source=v["url"])) is not None:
                     continue
@@ -223,6 +230,11 @@ def main() -> None:
                          "many channels are approved — full coverage still happens, spread across runs. "
                          "Default: 50. Pass 0 or a negative number to poll everything, every run.")
     parser.add_argument("--min-duration", type=float, default=180.0)
+    parser.add_argument("--max-duration", type=float, default=1200.0,
+                         help="Skip videos longer than this many seconds (default: 1200 = 20 minutes). "
+                         "Long source videos take proportionally longer to transcribe/render (especially "
+                         "on CPU) without necessarily producing better clips. Pass 0 or a negative number "
+                         "to disable this cap.")
     parser.add_argument(
         "--from-probe-files", nargs="?", const="data/cc_supply_probe_*.json", default=None,
         help="Source candidates from saved cc_supply_probe.py JSON output instead of live-polling recent "
@@ -267,15 +279,17 @@ def main() -> None:
     if not args.dry_run and not _acquire_lock(lock_path):
         sys.exit(0)
     try:
+        max_duration = args.max_duration if args.max_duration and args.max_duration > 0 else None
         if args.from_probe_files:
             candidates = find_backlog_candidates(
-                trust_db_path, data_dir, args.from_probe_files, args.min_duration
+                trust_db_path, data_dir, args.from_probe_files, args.min_duration,
+                max_duration=max_duration,
             )
         else:
             poll_limit = args.channel_poll_limit if args.channel_poll_limit and args.channel_poll_limit > 0 else None
             candidates = find_new_candidates(
                 api_key, trust_db_path, data_dir, args.min_duration, args.per_channel_sample,
-                channel_poll_limit=poll_limit,
+                channel_poll_limit=poll_limit, max_duration=max_duration,
             )
         candidates = candidates[: args.max_new]
         _process_candidates(candidates, args)
