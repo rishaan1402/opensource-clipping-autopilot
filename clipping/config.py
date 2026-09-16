@@ -171,6 +171,13 @@ GEMINI_FALLBACK_MODEL = "gemini-3.6-flash"
 LOCAL_MODEL = "Qwen/Qwen2.5-32B-Instruct-AWQ"
 LOCAL_BASE_URL = "http://localhost:8000/v1"
 
+# BGE semantic dedup — catches the LLM picking two candidates that are secretly the
+# same moment restated, which hash-based dedup (clipping.phase1.deduplication) can't see.
+# bge-small is a good speed/quality tradeoff for this: it runs once per candidate per
+# video, not in a hot loop, so bge-base would also be fine if quality matters more here.
+BGE_MODEL = "BAAI/bge-small-en-v1.5"
+SEMANTIC_DEDUP_THRESHOLD = 0.92
+
 
 # ==============================================================================
 # CLI PARSER
@@ -511,6 +518,27 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.3,
         help="Weight (0-1) given to the monetization score when combining with quality score.",
+    )
+
+    # --- Semantic Dedup (BGE) ---
+    dedup_group = p.add_argument_group("Semantic Dedup")
+    dedup_group.add_argument(
+        "--no-semantic-dedup",
+        action="store_true",
+        default=False,
+        help="Disable BGE-embedding semantic dedup of AI-selected candidates within a video.",
+    )
+    dedup_group.add_argument(
+        "--semantic-dedup-threshold",
+        type=float,
+        default=SEMANTIC_DEDUP_THRESHOLD,
+        help="Cosine similarity above which two candidates are treated as near-duplicates "
+        "(the lower-viral_score one is dropped). 0-1, higher = stricter (fewer drops).",
+    )
+    dedup_group.add_argument(
+        "--bge-model",
+        default=BGE_MODEL,
+        help="BGE sentence-embedding model name (sentence-transformers compatible) used for semantic dedup.",
     )
 
     # --- Checkpoint & Resume ---
@@ -1060,6 +1088,10 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         enable_monetization_scoring=not args.no_monetization_scoring,
         monetization_quality_weight=args.quality_weight,
         monetization_weight=args.monetization_weight,
+        # Semantic Dedup
+        enable_semantic_dedup=not args.no_semantic_dedup,
+        semantic_dedup_threshold=args.semantic_dedup_threshold,
+        bge_model=args.bge_model,
         # Checkpoint & Resume
         enable_checkpoint=not args.no_checkpoint,
         reset_checkpoint=args.reset_checkpoint,

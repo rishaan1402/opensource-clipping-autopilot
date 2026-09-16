@@ -20,3 +20,4 @@ uvicorn
 python-multipart
 pydantic
 edge-tts
+sentence-transformers

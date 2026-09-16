@@ -180,6 +180,30 @@ def run_pipeline(cfg) -> list[dict]:
     metadata_path = os.path.join(cfg.outputs_dir, "metadata_preview.json")
     metadata.save_metadata_preview(result_json, path=metadata_path)
 
+    # Step 4.4 — Semantic dedup (optional, feature-flagged): drops AI-selected
+    # candidates that are near-duplicates of a higher-scoring one in the same
+    # batch, before spending render/scoring work on them.
+    if getattr(cfg, "enable_semantic_dedup", True):
+        from .phase1.semantic_dedup import deduplicate_candidates
+
+        before_count = len(result_json)
+        try:
+            result_json = deduplicate_candidates(
+                result_json,
+                segment_data,
+                threshold=getattr(cfg, "semantic_dedup_threshold", 0.92),
+                model_name=getattr(cfg, "bge_model", "BAAI/bge-small-en-v1.5"),
+            )
+            dropped = before_count - len(result_json)
+            if dropped:
+                print(f"🧹 Semantic dedup dropped {dropped} near-duplicate candidate(s).")
+                # Keep 'rank' sequential even if monetization scoring (which
+                # otherwise owns re-ranking) is disabled below.
+                for idx, item in enumerate(result_json):
+                    item["rank"] = idx + 1
+        except Exception as e:
+            print(f"⚠️ Semantic dedup failed: {e}. Continuing with all candidates.")
+
     # Step 4.5 — Monetization scoring (optional, feature-flagged)
     from .phase1.candidate_scoring import score_candidates, write_candidates_artifact
 
