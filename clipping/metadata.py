@@ -295,4 +295,4 @@ def save_metadata_preview(result_json: list[dict], path: str = "metadata_preview
     """Save normalized metadata to a JSON file."""
     with open(path, "w", encoding="utf-8") as f:
         json.dump(result_json, f, ensure_ascii=False, indent=2)
-    print(f"\n💾 Disimpan ke {path}")
+    print(f"\n💾 Saved to {path}")

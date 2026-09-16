@@ -146,31 +146,31 @@ def detect_video_encoder(cfg=None, target_h=1080):
         "-bufsize", f"{int(float(target_bitrate.replace('M', '')) * 2)}M",
     ]
 
-    # ponytail: NVENC -> AMD AMF -> AMD VAAPI -> CPU
+    # Priority order: NVENC -> AMD AMF -> AMD VAAPI -> CPU
     if _ffmpeg_has_encoder("h264_nvenc"):
         ok, _ = _test_encoder_runtime(nvenc_args_fastest)
         if ok:
-            print(f"🚀 Pakai NVIDIA NVENC {nvenc_preset_fast} (Bitrate {target_bitrate}, CQ {nvenc_cq})", flush=True)
+            print(f"🚀 Using NVIDIA NVENC {nvenc_preset_fast} (Bitrate {target_bitrate}, CQ {nvenc_cq})", flush=True)
             return {"name": "h264_nvenc", "args": nvenc_args_fastest}
 
         ok, _ = _test_encoder_runtime(nvenc_args_legacy)
         if ok:
-            print(f"🚀 Pakai NVIDIA NVENC {nvenc_preset_legacy} (Bitrate {target_bitrate}, CQ {nvenc_cq})", flush=True)
+            print(f"🚀 Using NVIDIA NVENC {nvenc_preset_legacy} (Bitrate {target_bitrate}, CQ {nvenc_cq})", flush=True)
             return {"name": "h264_nvenc", "args": nvenc_args_legacy}
 
     if _ffmpeg_has_encoder("h264_amf"):
         ok, _ = _test_encoder_runtime(amf_args)
         if ok:
-            print(f"🚀 Pakai AMD AMF (Bitrate {target_bitrate})", flush=True)
+            print(f"🚀 Using AMD AMF (Bitrate {target_bitrate})", flush=True)
             return {"name": "h264_amf", "args": amf_args}
 
     if _ffmpeg_has_encoder("h264_vaapi"):
         ok, _ = _test_encoder_runtime(vaapi_args)
         if ok:
-            print(f"🚀 Pakai AMD VAAPI (Bitrate {target_bitrate})", flush=True)
+            print(f"🚀 Using AMD VAAPI (Bitrate {target_bitrate})", flush=True)
             return {"name": "h264_vaapi", "args": vaapi_args}
 
-    print(f"⚠️ Fallback ke CPU libx264 ({cpu_preset}, CRF {cpu_crf}, Max {target_bitrate})", flush=True)
+    print(f"⚠️ Falling back to CPU libx264 ({cpu_preset}, CRF {cpu_crf}, Max {target_bitrate})", flush=True)
     return {"name": "libx264", "args": cpu_args}
 
 

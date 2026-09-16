@@ -467,10 +467,10 @@ def upload_manifest_to_youtube(
         rank = item.get("rank")
         manifest_row = get_manifest_row_by_rank(updated_manifest, rank)
 
-        print(f"\\n=== Upload Rank {rank} ===")
-        print(f"Judul  : {item.get('youtube_title_final')}")
-        print(f"Video  : {item.get('video_path')}")
-        print(f"Jadwal : {publish_at_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        print(f"\n=== Upload Rank {rank} ===")
+        print(f"Title    : {item.get('youtube_title_final')}")
+        print(f"Video    : {item.get('video_path')}")
+        print(f"Schedule : {publish_at_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
         if require_approval and not safety_mod.prompt_manual_approval(item, publish_at_local):
             print(f"⏭️ Rank {rank} skipped (not approved).")
@@ -514,7 +514,7 @@ def upload_manifest_to_youtube(
         save_json_file(result_file, upload_results)
         save_json_file(updated_manifest_file, updated_manifest)
 
-    print(f"\\n💾 Hasil upload disimpan ke: {result_file}")
-    print(f"💾 Manifest terupdate disimpan ke: {updated_manifest_file}")
+    print(f"\n💾 Upload results saved to: {result_file}")
+    print(f"💾 Updated manifest saved to: {updated_manifest_file}")
 
     return upload_results

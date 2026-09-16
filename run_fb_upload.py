@@ -58,12 +58,12 @@ def main():
     # Check required env vars
     if not os.environ.get("META_PAGE_ACCESS_TOKEN"):
         print("❌ ERROR: META_PAGE_ACCESS_TOKEN not set.")
-        print("   Tambahkan ke file .env atau set sebagai environment variable.")
+        print("   Add it to the .env file or set it as an environment variable.")
         sys.exit(1)
 
     if not os.environ.get("META_PAGE_ID"):
         print("❌ ERROR: META_PAGE_ID not set.")
-        print("   Tambahkan ke file .env atau set sebagai environment variable.")
+        print("   Add it to the .env file or set it as an environment variable.")
         sys.exit(1)
 
     upload_manifest_to_facebook(

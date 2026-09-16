@@ -320,7 +320,7 @@ def run_pipeline(cfg) -> list[dict]:
                 os.remove(audio_path)
         except Exception as e:
             print(f"⚠️ Diarization failed: {e}")
-            print("   Fallback ke mode render biasa (tanpa split-screen).")
+            print("   Falling back to normal render mode (without split-screen).")
             diarization_data = None
 
     # Step 6 — Video encoder & glitch
