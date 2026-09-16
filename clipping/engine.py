@@ -4,6 +4,7 @@ clipping.engine — Download, Transcription & Gemini AI Analysis
 Maps to Cell 2 (The Engine) of the notebook.
 """
 
+import glob
 import json
 import os
 import re
@@ -177,6 +178,16 @@ def download_video(
     if os.path.exists(output_path):
         os.remove(output_path)
 
+    # Also clean up any stray .part files from a previous interrupted download at
+    # this same output_path — yt-dlp's default resume behavior (continuedl=True)
+    # would otherwise try to resume from a partial file whose byte range no longer
+    # matches the server (e.g. a re-signed YouTube URL), failing with a
+    # "416 Requested range not satisfiable" error. continuedl=False below is the
+    # primary fix; this glob is belt-and-suspenders since output_path is always
+    # freshly downloaded here, never actually resumed on purpose.
+    for stray in glob.glob(f"{output_path}*.part"):
+        os.remove(stray)
+
     # --- Google Drive: use gdown instead of yt-dlp ---
     if source_platform == "gdrive":
         _download_gdrive(url, output_path)
@@ -199,16 +210,23 @@ def download_video(
             "progress_hooks": [_ydl_progress_hook],
             "extractor_args": {"youtube": ["player_client=android,web"]},
             "overwrites": True,
+            # output_path is always freshly deleted above, so there is never a
+            # legitimate partial download to resume here — leaving yt-dlp's default
+            # resume-by-byte-range behavior on just risks a stale .part file's range
+            # no longer matching the server (e.g. a re-signed YouTube URL) and
+            # failing with "416 Requested range not satisfiable".
+            "continuedl": False,
         }
     else:
         # TikTok / Instagram: ensure video and audio are merged
-        # We explicitly prefer H.264 over H.265 (TikTok's bytevc1) to prevent 
+        # We explicitly prefer H.264 over H.265 (TikTok's bytevc1) to prevent
         # PyAV/faster-whisper from crashing with IndexError on Kaggle/Colab.
         ydl_opts = {
             "format": "bestvideo[vcodec^=h264]+bestaudio/best[vcodec^=h264]/best",
             "outtmpl": output_path,
             "quiet": True,
             "merge_output_format": "mp4",
+            "continuedl": False,
             "progress_hooks": [_ydl_progress_hook],
             "overwrites": True,
         }
@@ -224,7 +242,6 @@ def download_video(
     # --- Subtitle download — only supported for YouTube ---
     if use_dlp_subs and uses_youtube_format:
         print("      Trying to find auto-generated subtitles (en / id)...")
-        import glob
 
         for lang in ["en", "id"]:
             ydl_opts_subs = ydl_opts.copy()
