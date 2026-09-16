@@ -37,6 +37,7 @@ import os
 import subprocess
 import sys
 from itertools import zip_longest
+from typing import Optional
 
 try:
     from dotenv import load_dotenv
@@ -51,7 +52,8 @@ from cc_supply_probe import fetch_video_details, _parse_iso8601_duration
 
 
 def find_new_candidates(
-    api_key: str, trust_db_path: str, dedup_dir: str, min_duration: float, per_channel_sample: int = 50
+    api_key: str, trust_db_path: str, dedup_dir: str, min_duration: float, per_channel_sample: int = 50,
+    channel_poll_limit: Optional[int] = None,
 ) -> list[dict]:
     """
     Returns new, license-re-verified, long-enough candidates from approved
@@ -60,15 +62,31 @@ def find_new_candidates(
     whichever channel happens to sort first. A single prolific channel
     (a city council streaming every meeting, say) would otherwise fill an
     entire --max-new cap before any other approved channel got a look in.
+
+    Two quota-saving measures, since polling every approved channel on every
+    run gets expensive fast at scale (each channel costs at least one
+    playlistItems.list call, regardless of how many videos --max-new lets
+    through afterward):
+      - uploads_playlist_id is cached forever (channel_trust.get_or_fetch_uploads_playlist_id)
+        since it never changes, cutting channels.list calls to a one-time cost per channel.
+      - channel_poll_limit bounds how many channels get polled THIS run, picking the
+        oldest-polled (or never-polled) ones first, so cost per run stays flat regardless
+        of how many total channels are approved — full coverage still happens, just spread
+        across multiple runs instead of paying for all of them every time.
     """
     dedup = DeduplicationManager(dedup_dir)
-    approved = channel_trust.list_by_review_status(trust_db_path, channel_trust.REVIEW_APPROVED)
-    print(f"📡 Polling {len(approved)} approved channels for new uploads...")
+    approved = channel_trust.list_approved_for_polling(trust_db_path, limit=channel_poll_limit)
+    total_approved = len(channel_trust.list_by_review_status(trust_db_path, channel_trust.REVIEW_APPROVED))
+    print(f"📡 Polling {len(approved)} of {total_approved} approved channels for new uploads "
+          f"(oldest-polled-first rotation)...")
 
     per_channel: list[list[dict]] = []
     for ch in approved:
         try:
-            uploads_playlist_id = channel_trust._get_uploads_playlist_id(api_key, ch["channel_id"])
+            uploads_playlist_id = channel_trust.get_or_fetch_uploads_playlist_id(
+                api_key, trust_db_path, ch["channel_id"]
+            )
+            channel_trust.mark_polled(trust_db_path, ch["channel_id"])
             if not uploads_playlist_id:
                 continue
             recent_ids = channel_trust._get_recent_video_ids(api_key, uploads_playlist_id, per_channel_sample)
@@ -199,6 +217,11 @@ def main() -> None:
     parser.add_argument("--per-channel-sample", type=int, default=50,
                          help="How many of each channel's most recent uploads to check (50 = YouTube API's max "
                          "per call, and covers full history for most small/medium channels).")
+    parser.add_argument("--channel-poll-limit", type=int, default=None,
+                         help="Only poll this many approved channels per run (oldest-polled-first rotation), "
+                         "instead of all of them every time. Bounds YouTube API cost per run regardless of how "
+                         "many channels are approved — full coverage still happens, spread across runs. "
+                         "Default: no limit (poll everything, every run).")
     parser.add_argument("--min-duration", type=float, default=180.0)
     parser.add_argument(
         "--from-probe-files", nargs="?", const="data/cc_supply_probe_*.json", default=None,
@@ -210,13 +233,24 @@ def main() -> None:
     parser.add_argument("--clips", type=int, default=1, help="Clips per video (passed to autopilot.py).")
     parser.add_argument("--enable-broll", action="store_true")
     parser.add_argument("--enable-bgm", action="store_true")
-    parser.add_argument("--source-height", default="480")
+    parser.add_argument("--source-height", default="1080")
+    parser.add_argument("--cookies-file", default=None,
+                         help="Pass through to autopilot.py / clipping.config — fixes YouTube's "
+                         "bot-check block on cloud IPs (Kaggle, Colab, etc.).")
     parser.add_argument("--whisper-model", default="small")
     parser.add_argument("--whisper-device", default="cpu")
     parser.add_argument("--whisper-compute-type", default="int8")
     parser.add_argument("--face-detector", default="yolo", choices=["mediapipe", "yolo"])
     parser.add_argument("--upload-youtube", action="store_true", help="Pass through to autopilot.py.")
     parser.add_argument("--youtube-no-approval", action="store_true", help="Pass through to autopilot.py.")
+    parser.add_argument("--gemini-model", default=None, help="Pass through to autopilot.py / clipping.config.")
+    parser.add_argument("--gemini-fallback-model", default=None, help="Pass through to autopilot.py / clipping.config.")
+    parser.add_argument("--ai-provider", default=None, choices=["gemini", "nvidia", "groq"],
+                         help="Pass through to autopilot.py / clipping.config.")
+    parser.add_argument("--nvidia-model", default=None, help="Pass through to autopilot.py / clipping.config.")
+    parser.add_argument("--groq-model", default=None, help="Pass through to autopilot.py / clipping.config.")
+    parser.add_argument("--groq-max-duration-seconds", type=int, default=None,
+                         help="Pass through to autopilot.py / clipping.config.")
     args = parser.parse_args()
 
     api_key = os.environ.get("YOUTUBE_DATA_API_KEY", "")
@@ -237,7 +271,8 @@ def main() -> None:
             )
         else:
             candidates = find_new_candidates(
-                api_key, trust_db_path, data_dir, args.min_duration, args.per_channel_sample
+                api_key, trust_db_path, data_dir, args.min_duration, args.per_channel_sample,
+                channel_poll_limit=args.channel_poll_limit,
             )
         candidates = candidates[: args.max_new]
         _process_candidates(candidates, args)
@@ -265,6 +300,7 @@ def _process_candidates(candidates: list[dict], args) -> None:
             "--url", c["url"],
             "--clips", str(args.clips),
             "--source-height", args.source_height,
+        ] + (["--cookies-file", args.cookies_file] if args.cookies_file else []) + [
             "--whisper-model", args.whisper_model,
             "--whisper-device", args.whisper_device,
             "--whisper-compute-type", args.whisper_compute_type,
@@ -279,6 +315,18 @@ def _process_candidates(candidates: list[dict], args) -> None:
             cmd.append("--upload-youtube")
         if args.youtube_no_approval:
             cmd.append("--youtube-no-approval")
+        if args.gemini_model is not None:
+            cmd += ["--gemini-model", args.gemini_model]
+        if args.gemini_fallback_model is not None:
+            cmd += ["--gemini-fallback-model", args.gemini_fallback_model]
+        if args.ai_provider is not None:
+            cmd += ["--ai-provider", args.ai_provider]
+        if args.nvidia_model is not None:
+            cmd += ["--nvidia-model", args.nvidia_model]
+        if args.groq_model is not None:
+            cmd += ["--groq-model", args.groq_model]
+        if args.groq_max_duration_seconds is not None:
+            cmd += ["--groq-max-duration-seconds", str(args.groq_max_duration_seconds)]
 
         result = subprocess.run(cmd)
         if result.returncode != 0:

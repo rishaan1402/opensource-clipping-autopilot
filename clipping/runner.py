@@ -85,6 +85,7 @@ def run_pipeline(cfg) -> list[dict]:
             getattr(cfg, "use_dlp_subs", False),
             getattr(cfg, "download_source_height", "max"),
             source_platform=source_platform,
+            cookies_file=getattr(cfg, "cookies_file", None),
         )
         if use_checkpoint:
             checkpoint.mark_step_complete(

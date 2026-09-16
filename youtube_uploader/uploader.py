@@ -74,80 +74,89 @@ def to_rfc3339_utc(dt_local):
 
 
 def get_latest_scheduled_publish_time(youtube, tz_name="Asia/Makassar", max_pages=10):
+    """Returns None (not a raised exception) on any API failure, including a quota-exhausted
+    channels.list/playlistItems.list/videos.list call — the caller (get_first_publish_time)
+    already treats None as "couldn't determine, use the fallback schedule," so a quota hit here
+    should degrade the same way check_queue_limit's quota handling does, not crash the upload
+    for a video that was already successfully clipped."""
     tz = ZoneInfo(tz_name)
     now_local = datetime.now(tz)
 
     print("🔎 Mengecek scheduled terakhir di channel YouTube...")
 
-    channel_resp = youtube.channels().list(part="contentDetails", mine=True).execute()
-    channel_items = channel_resp.get("items", [])
-    if not channel_items:
-        print("⚠️ Tidak bisa menemukan channel milik akun ini.")
-        return None
+    try:
+        channel_resp = youtube.channels().list(part="contentDetails", mine=True).execute()
+        channel_items = channel_resp.get("items", [])
+        if not channel_items:
+            print("⚠️ Tidak bisa menemukan channel milik akun ini.")
+            return None
 
-    uploads_playlist_id = (
-        channel_items[0]
-        .get("contentDetails", {})
-        .get("relatedPlaylists", {})
-        .get("uploads")
-    )
+        uploads_playlist_id = (
+            channel_items[0]
+            .get("contentDetails", {})
+            .get("relatedPlaylists", {})
+            .get("uploads")
+        )
 
-    if not uploads_playlist_id:
-        print("⚠️ Uploads playlist tidak ditemukan.")
-        return None
+        if not uploads_playlist_id:
+            print("⚠️ Uploads playlist tidak ditemukan.")
+            return None
 
-    latest_dt = None
-    page_token = None
+        latest_dt = None
+        page_token = None
 
-    for _ in range(max_pages):
-        playlist_resp = youtube.playlistItems().list(
-            part="contentDetails",
-            playlistId=uploads_playlist_id,
-            maxResults=50,
-            pageToken=page_token
-        ).execute()
-
-        playlist_items = playlist_resp.get("items", [])
-        if not playlist_items:
-            break
-
-        video_ids = []
-        for row in playlist_items:
-            video_id = row.get("contentDetails", {}).get("videoId")
-            if video_id:
-                video_ids.append(video_id)
-
-        if video_ids:
-            videos_resp = youtube.videos().list(
-                part="status,snippet",
-                id=",".join(video_ids),
-                maxResults=50
+        for _ in range(max_pages):
+            playlist_resp = youtube.playlistItems().list(
+                part="contentDetails",
+                playlistId=uploads_playlist_id,
+                maxResults=50,
+                pageToken=page_token
             ).execute()
 
-            for video in videos_resp.get("items", []):
-                status = video.get("status", {})
-                publish_at = status.get("publishAt")
-                privacy_status = status.get("privacyStatus")
+            playlist_items = playlist_resp.get("items", [])
+            if not playlist_items:
+                break
 
-                if not publish_at:
-                    continue
+            video_ids = []
+            for row in playlist_items:
+                video_id = row.get("contentDetails", {}).get("videoId")
+                if video_id:
+                    video_ids.append(video_id)
 
-                dt_local = parse_rfc3339_to_local(publish_at, tz_name)
-                if dt_local is None:
-                    continue
+            if video_ids:
+                videos_resp = youtube.videos().list(
+                    part="status,snippet",
+                    id=",".join(video_ids),
+                    maxResults=50
+                ).execute()
 
-                if dt_local <= now_local:
-                    continue
+                for video in videos_resp.get("items", []):
+                    status = video.get("status", {})
+                    publish_at = status.get("publishAt")
+                    privacy_status = status.get("privacyStatus")
 
-                if privacy_status != "private":
-                    continue
+                    if not publish_at:
+                        continue
 
-                if latest_dt is None or dt_local > latest_dt:
-                    latest_dt = dt_local
+                    dt_local = parse_rfc3339_to_local(publish_at, tz_name)
+                    if dt_local is None:
+                        continue
 
-        page_token = playlist_resp.get("nextPageToken")
-        if not page_token:
-            break
+                    if dt_local <= now_local:
+                        continue
+
+                    if privacy_status != "private":
+                        continue
+
+                    if latest_dt is None or dt_local > latest_dt:
+                        latest_dt = dt_local
+
+            page_token = playlist_resp.get("nextPageToken")
+            if not page_token:
+                break
+    except Exception as e:
+        print(f"⚠️ Gagal mengecek scheduled terakhir: {e}. Pakai fallback schedule default.")
+        return None
 
     if latest_dt:
         print(f"✅ Scheduled terakhir ditemukan: {latest_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")

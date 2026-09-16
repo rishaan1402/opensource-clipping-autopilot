@@ -26,6 +26,12 @@ from typing import Optional
 
 import requests
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels"
 PLAYLIST_ITEMS_URL = "https://www.googleapis.com/youtube/v3/playlistItems"
 VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
@@ -67,6 +73,16 @@ RED_FLAG_KEYWORDS = [
 # heavily-CC sample AND no red-flag hit to skip human review entirely.
 AUTO_APPROVE_MIN_CC_COUNT = 10
 AUTO_APPROVE_MIN_CC_RATIO = 0.70
+# CC-licensing consistency alone says nothing about whether a channel's content
+# actually performs — a channel can be 100% CC-licensed and still average a few
+# hundred views. This is the actual "viral capability" bar: average view count
+# across the channel's sampled CC-licensed videos. CC-licensed content is
+# structurally skewed away from mainstream viral numbers (creators who want
+# reach/monetization essentially never give away reuse rights), so this is
+# deliberately not set to a "real virality" bar like 500k-1M+ — 50k is meant to
+# separate "has a real audience" from "essentially no traction," not to demand
+# mainstream-viral performance from a supply pool that structurally can't provide it.
+AUTO_APPROVE_MIN_AVG_VIEWS = 30000
 
 
 def _find_red_flags(channel_name: str, titles: list[str]) -> list[str]:
@@ -119,6 +135,12 @@ def init_db(db_path: str) -> None:
             conn.execute("ALTER TABLE channel_trust ADD COLUMN red_flags TEXT NOT NULL DEFAULT ''")
         if "auto_approved" not in existing_cols:
             conn.execute("ALTER TABLE channel_trust ADD COLUMN auto_approved INTEGER NOT NULL DEFAULT 0")
+        if "uploads_playlist_id" not in existing_cols:
+            conn.execute("ALTER TABLE channel_trust ADD COLUMN uploads_playlist_id TEXT")
+        if "last_polled_at" not in existing_cols:
+            conn.execute("ALTER TABLE channel_trust ADD COLUMN last_polled_at TEXT")
+        if "avg_view_count" not in existing_cols:
+            conn.execute("ALTER TABLE channel_trust ADD COLUMN avg_view_count REAL NOT NULL DEFAULT 0")
         conn.commit()
 
 
@@ -155,6 +177,57 @@ def _get_recent_video_ids(api_key: str, uploads_playlist_id: str, sample_size: i
     return [item["contentDetails"]["videoId"] for item in resp.json().get("items", [])]
 
 
+def get_or_fetch_uploads_playlist_id(api_key: str, db_path: str, channel_id: str) -> Optional[str]:
+    """Cached wrapper around _get_uploads_playlist_id — a channel's uploads playlist ID
+    is a permanent identifier that never changes, so once known it never needs re-fetching.
+    This is the single biggest avoidable cost in polling: without this cache, every
+    channels.list call is repeated on every single discovery run forever."""
+    init_db(db_path)
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT uploads_playlist_id FROM channel_trust WHERE channel_id = ?", (channel_id,)
+        ).fetchone()
+        if row and row["uploads_playlist_id"]:
+            return row["uploads_playlist_id"]
+
+    playlist_id = _get_uploads_playlist_id(api_key, channel_id)
+    if playlist_id:
+        with _connect(db_path) as conn:
+            conn.execute(
+                "UPDATE channel_trust SET uploads_playlist_id = ? WHERE channel_id = ?",
+                (playlist_id, channel_id),
+            )
+            conn.commit()
+    return playlist_id
+
+
+def mark_polled(db_path: str, channel_id: str) -> None:
+    with _connect(db_path) as conn:
+        conn.execute(
+            "UPDATE channel_trust SET last_polled_at = ? WHERE channel_id = ?",
+            (datetime.now(timezone.utc).isoformat(), channel_id),
+        )
+        conn.commit()
+
+
+def list_approved_for_polling(db_path: str, limit: Optional[int] = None) -> list[dict]:
+    """Approved channels ordered oldest-polled-first (never-polled channels first, via
+    NULL sorting first) — the rotation that lets a bounded --channel-poll-limit per run
+    still eventually cover every approved channel instead of always polling the same ones."""
+    init_db(db_path)
+    with _connect(db_path) as conn:
+        query = (
+            "SELECT * FROM channel_trust WHERE review_status = ? "
+            "ORDER BY last_polled_at IS NOT NULL, last_polled_at ASC"
+        )
+        params: list = [REVIEW_APPROVED]
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+
 def check_channel_consistency(api_key: str, channel_id: str, channel_name: str = "", sample_size: int = 20) -> dict:
     """
     Fresh (uncached) check: what fraction of this channel's recent uploads
@@ -172,26 +245,36 @@ def check_channel_consistency(api_key: str, channel_id: str, channel_name: str =
         if len(video_ids) < MIN_SAMPLE:
             return {
                 "sample_size": len(video_ids), "cc_count": 0, "cc_ratio": 0.0,
-                "verdict": VERDICT_INSUFFICIENT_DATA, "red_flags": [],
+                "verdict": VERDICT_INSUFFICIENT_DATA, "red_flags": [], "avg_view_count": 0.0,
             }
 
         cc_count = 0
         titles = []
+        cc_view_counts = []
         for batch in _chunked(video_ids, 50):
             resp = requests.get(
                 VIDEOS_URL,
-                params={"part": "status,snippet", "id": ",".join(batch), "key": api_key},
+                params={"part": "status,snippet,statistics", "id": ",".join(batch), "key": api_key},
                 timeout=10,
             )
             resp.raise_for_status()
             for item in resp.json().get("items", []):
-                if item.get("status", {}).get("license") == "creativeCommon":
+                is_cc = item.get("status", {}).get("license") == "creativeCommon"
+                if is_cc:
                     cc_count += 1
+                    try:
+                        cc_view_counts.append(int(item.get("statistics", {}).get("viewCount", 0)))
+                    except (TypeError, ValueError):
+                        pass
                 title = item.get("snippet", {}).get("title")
                 if title:
                     titles.append(title)
 
         cc_ratio = cc_count / len(video_ids)
+        # Average view count across the CC-licensed videos specifically — those are the
+        # ones this pipeline would actually clip from, so a channel's non-CC uploads
+        # (which might perform very differently) shouldn't factor into this signal.
+        avg_view_count = sum(cc_view_counts) / len(cc_view_counts) if cc_view_counts else 0.0
         verdict = (
             VERDICT_TRUSTED
             if cc_count >= MIN_CC_COUNT and cc_ratio >= MIN_CC_RATIO
@@ -200,12 +283,15 @@ def check_channel_consistency(api_key: str, channel_id: str, channel_name: str =
         red_flags = _find_red_flags(channel_name, titles)
         return {
             "sample_size": len(video_ids), "cc_count": cc_count, "cc_ratio": cc_ratio,
-            "verdict": verdict, "red_flags": red_flags,
+            "verdict": verdict, "red_flags": red_flags, "avg_view_count": avg_view_count,
         }
 
     except Exception as exc:  # noqa: BLE001 — surfaced in the returned dict, not swallowed silently
         print(f"⚠️  Channel trust check failed for {channel_id}: {exc}")
-        return {"sample_size": 0, "cc_count": 0, "cc_ratio": 0.0, "verdict": VERDICT_CHECK_FAILED, "red_flags": []}
+        return {
+            "sample_size": 0, "cc_count": 0, "cc_ratio": 0.0, "verdict": VERDICT_CHECK_FAILED,
+            "red_flags": [], "avg_view_count": 0.0,
+        }
 
 
 def get_or_check_channel_trust(
@@ -243,6 +329,7 @@ def get_or_check_channel_trust(
         result["verdict"] == VERDICT_TRUSTED
         and result["cc_count"] >= AUTO_APPROVE_MIN_CC_COUNT
         and result["cc_ratio"] >= AUTO_APPROVE_MIN_CC_RATIO
+        and result.get("avg_view_count", 0.0) >= AUTO_APPROVE_MIN_AVG_VIEWS
         and not red_flags
     )
 
@@ -258,13 +345,14 @@ def get_or_check_channel_trust(
             """
             INSERT INTO channel_trust
                 (channel_id, channel_name, sample_size, cc_count, cc_ratio, verdict,
-                 review_status, red_flags, auto_approved, checked_at)
+                 review_status, red_flags, auto_approved, checked_at, avg_view_count)
             VALUES (:channel_id, :channel_name, :sample_size, :cc_count, :cc_ratio, :verdict,
-                    :review_status, :red_flags, :auto_approved, :checked_at)
+                    :review_status, :red_flags, :auto_approved, :checked_at, :avg_view_count)
             ON CONFLICT(channel_id) DO UPDATE SET
                 channel_name=excluded.channel_name, sample_size=excluded.sample_size,
                 cc_count=excluded.cc_count, cc_ratio=excluded.cc_ratio,
-                verdict=excluded.verdict, red_flags=excluded.red_flags, checked_at=excluded.checked_at
+                verdict=excluded.verdict, red_flags=excluded.red_flags, checked_at=excluded.checked_at,
+                avg_view_count=excluded.avg_view_count
                 -- review_status/reviewed_at/auto_approved deliberately NOT overwritten here —
                 -- a routine trust re-check must never silently reset a human's approve/block
                 -- decision, or relabel a manually-approved channel as auto-approved.
@@ -276,6 +364,50 @@ def get_or_check_channel_trust(
             "SELECT * FROM channel_trust WHERE channel_id = ?", (channel_id,)
         ).fetchone()
         return dict(row)
+
+
+def revalidate_view_counts(api_key: str, db_path: str, sample_size: int = 20) -> dict:
+    """One-time cleanup pass: force-refresh avg_view_count for every currently-approved
+    channel (ignoring the normal 30-day cache) and demote any that fall short of
+    AUTO_APPROVE_MIN_AVG_VIEWS back to REVIEW_PENDING. Channels approved before this
+    threshold existed were vetted purely on CC-licensing consistency, which says nothing
+    about whether the content actually has an audience — this retroactively applies the
+    view-count bar to that earlier pass. Demotes to pending, not blocked: reversible, a
+    human can still re-approve after looking, this just pulls them out of the
+    auto-processing pool for now."""
+    init_db(db_path)
+    approved = list_by_review_status(db_path, REVIEW_APPROVED)
+    print(f"🔎 Re-checking view counts for {len(approved)} approved channels...")
+
+    kept, demoted, failed = 0, 0, 0
+    for i, ch in enumerate(approved, 1):
+        channel_id = ch["channel_id"]
+        channel_name = ch["channel_name"]
+        result = check_channel_consistency(api_key, channel_id, channel_name or "", sample_size)
+        avg_views = result.get("avg_view_count", 0.0)
+
+        with _connect(db_path) as conn:
+            conn.execute(
+                "UPDATE channel_trust SET avg_view_count = ?, checked_at = ? WHERE channel_id = ?",
+                (avg_views, datetime.now(timezone.utc).isoformat(), channel_id),
+            )
+            conn.commit()
+
+        if result["verdict"] == VERDICT_CHECK_FAILED:
+            failed += 1
+            print(f"   ⚠️  [{i}/{len(approved)}] {channel_name}: check failed, left as-is")
+            continue
+
+        if avg_views < AUTO_APPROVE_MIN_AVG_VIEWS:
+            set_review_status(db_path, channel_id, REVIEW_PENDING)
+            demoted += 1
+            print(f"   ⬇️  [{i}/{len(approved)}] {channel_name}: {avg_views:,.0f} avg views — demoted to pending")
+        else:
+            kept += 1
+            print(f"   ✅ [{i}/{len(approved)}] {channel_name}: {avg_views:,.0f} avg views — kept")
+
+    print(f"\nDone: {kept} kept, {demoted} demoted to pending, {failed} check failures (left as-is).")
+    return {"kept": kept, "demoted": demoted, "failed": failed}
 
 
 def set_review_status(db_path: str, channel_id: str, review_status: str) -> None:
@@ -334,6 +466,18 @@ def _cli() -> None:
     p_block.add_argument("channel_id")
     sub.add_parser("auto-approved", help="Audit trail: channels that skipped human review via the auto-approve heuristic")
 
+    p_revalidate = sub.add_parser(
+        "revalidate-views",
+        help=f"One-time cleanup: force-refresh avg_view_count for all approved channels and "
+        f"demote any below {AUTO_APPROVE_MIN_AVG_VIEWS:,} avg views to pending. Costs ~2 "
+        "YouTube API calls per approved channel.",
+    )
+    p_revalidate.add_argument(
+        "--api-key", default=None,
+        help="YouTube Data API key. Defaults to the YOUTUBE_DATA_API_KEY env var.",
+    )
+    p_revalidate.add_argument("--sample-size", type=int, default=20)
+
     args = p.parse_args()
 
     if args.command == "pending":
@@ -364,6 +508,12 @@ def _cli() -> None:
             )
         print(f"\n{len(rows)} channel(s) auto-approved without human review. "
               f"Use 'block <channel_id>' on any of these to revoke.")
+    elif args.command == "revalidate-views":
+        api_key = args.api_key or os.environ.get("YOUTUBE_DATA_API_KEY", "")
+        if not api_key:
+            print("❌ No API key — pass --api-key or set YOUTUBE_DATA_API_KEY.")
+            return
+        revalidate_view_counts(api_key, args.db, sample_size=args.sample_size)
 
 
 if __name__ == "__main__":

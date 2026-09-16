@@ -156,6 +156,13 @@ RENDER_OUTPUT_HEIGHT = 1080
 # AI Provider
 AI_PROVIDER = "gemini"
 NVIDIA_MODEL = "deepseek-ai/deepseek-v4-pro"
+GROQ_MODEL = "openai/gpt-oss-120b"
+# Groq's free tier TPM budget (8,000 for gpt-oss-20b/120b, observed directly from a live
+# account) is blown by a full transcript once the source video runs much past ~10 minutes —
+# this is the input prompt size, not something --max-tokens or retries can work around.
+# Above this duration, skip straight to the Gemini fallback instead of wasting three
+# guaranteed-to-fail Groq attempts (and the wait between them) first.
+GROQ_MAX_VIDEO_DURATION_SECONDS = 600
 GEMINI_MODEL = "gemini-3-flash-preview"
 GEMINI_FALLBACK_MODEL = "gemini-3.6-flash"
 
@@ -243,6 +250,14 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_parse_download_height,
         default=DOWNLOAD_SOURCE_HEIGHT,
         help="Preferred source download max height. Use 'max' to fetch highest available quality.",
+    )
+    p.add_argument(
+        "--cookies-file",
+        default=None,
+        help="Path to a Netscape-format cookies.txt (exported from a real logged-in YouTube "
+        "session) for yt-dlp to authenticate with. Fixes YouTube's 'Sign in to confirm "
+        "you're not a bot' block, which cloud/datacenter IPs (Kaggle, Colab, etc.) trip "
+        "far more often than residential ones.",
     )
     p.add_argument(
         "--render-height",
@@ -419,14 +434,35 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--ai-provider",
-        choices=["gemini", "nvidia"],
+        choices=["gemini", "nvidia", "groq"],
         default=AI_PROVIDER,
-        help="AI provider for video analysis (gemini or nvidia).",
+        help="AI provider for video analysis (gemini, nvidia, or groq).",
     )
     p.add_argument(
         "--nvidia-model",
         default=NVIDIA_MODEL,
         help="Model name for NVIDIA NIM API (e.g. deepseek-ai/deepseek-v3).",
+    )
+    p.add_argument(
+        "--groq-model",
+        default=GROQ_MODEL,
+        help="Model name for Groq API (e.g. llama-3.3-70b-versatile, openai/gpt-oss-120b).",
+    )
+    p.add_argument(
+        "--groq-max-duration-seconds",
+        type=int,
+        default=GROQ_MAX_VIDEO_DURATION_SECONDS,
+        help="For source videos longer than this, don't attempt Groq — a full transcript past "
+        "~10min blows Groq's free-tier TPM budget regardless of retries. Set to 0 to disable "
+        "this check. What happens instead is controlled by --groq-oversized-fallback-gemini.",
+    )
+    p.add_argument(
+        "--groq-oversized-fallback-gemini",
+        action="store_true",
+        help="When a video is too long for Groq (see --groq-max-duration-seconds), fall back "
+        "to Gemini instead of skipping the video outright. Off by default — while Gemini's own "
+        "free-tier daily quota is also exhausted, falling back just burns a guaranteed-fail "
+        "10-attempt retry cycle per video instead of cleanly skipping to the next candidate.",
     )
     p.add_argument("--gemini-model", default=GEMINI_MODEL, help="Gemini model name")
     p.add_argument(
@@ -932,6 +968,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         jumlah_clip=args.clips,
         pilihan_rasio=args.ratio,
         download_source_height=args.source_height,
+        cookies_file=args.cookies_file,
         render_output_height=args.render_height,
         # Konten & Hook
         max_kata_per_subtitle=args.words_per_sub,
@@ -994,6 +1031,10 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         ai_provider=args.ai_provider,
         api_key_nvidia=os.environ.get("NVIDIA_API_KEY", ""),
         nvidia_model=args.nvidia_model,
+        api_key_groq=os.environ.get("GROQ_API_KEY", ""),
+        groq_model=args.groq_model,
+        groq_max_duration_seconds=args.groq_max_duration_seconds,
+        groq_oversized_fallback_gemini=args.groq_oversized_fallback_gemini,
         gemini_model=args.gemini_model,
         gemini_fallback_model=args.gemini_fallback_model,
         load_gemini_json=args.load_gemini_json,
