@@ -217,7 +217,11 @@ def has_natural_payoff(text: str) -> bool:
     if not trailing or trailing[-1] not in _TERMINAL_CHARS:
         return False
 
-    words = re.findall(r"[A-Za-z']+", trailing)
+    # Include digits so a sentence ending on a number ("...successful in
+    # 2027.") counts the number as the last word, not the nearest word
+    # before it — otherwise "in 2027." would check "in" against the
+    # dangling-word list and wrongly flag a complete sentence as cut off.
+    words = re.findall(r"[A-Za-z0-9']+", trailing)
     if not words:
         return False
     return words[-1].lower() not in _DANGLING_LAST_WORDS
