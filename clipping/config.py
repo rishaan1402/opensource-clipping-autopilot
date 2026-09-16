@@ -178,6 +178,10 @@ LOCAL_BASE_URL = "http://localhost:8000/v1"
 BGE_MODEL = "BAAI/bge-small-en-v1.5"
 SEMANTIC_DEDUP_THRESHOLD = 0.92
 
+# SigLIP zero-shot visual-interest scoring -- base model is a good speed/quality
+# tradeoff for a handful of frames per candidate, not a hot loop.
+SIGLIP_MODEL = "google/siglip-base-patch16-224"
+
 
 # ==============================================================================
 # CLI PARSER
@@ -524,8 +528,16 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="Weight (0-1) given to the audio-prosody score (see Prosody Scoring group) "
-        "when combining scores. Defaults to 0.0 (no-op) -- if set > 0, --quality-weight "
-        "and --monetization-weight must be reduced so all three still sum to 1.0.",
+        "when combining scores. Defaults to 0.0 (no-op) -- if set > 0, the other weights "
+        "must be reduced so all of them still sum to 1.0.",
+    )
+    mon_group.add_argument(
+        "--visual-weight",
+        type=float,
+        default=0.0,
+        help="Weight (0-1) given to the SigLIP visual-interest score (see Visual Scoring "
+        "group) when combining scores. Defaults to 0.0 (no-op) -- if set > 0, the other "
+        "weights must be reduced so all of them still sum to 1.0.",
     )
 
     # --- Prosody Scoring (Whisper audio-energy signal) ---
@@ -537,6 +549,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Disable audio-prosody feature extraction (pitch/energy variance, pause "
         "ratio) per candidate. Independent of --prosody-weight: this controls whether "
         "the signal is computed at all, not just whether it affects ranking.",
+    )
+
+    # --- Visual Scoring (SigLIP) ---
+    visual_group = p.add_argument_group("Visual Scoring")
+    visual_group.add_argument(
+        "--no-visual-scoring",
+        action="store_true",
+        default=False,
+        help="Disable SigLIP visual-interest scoring per candidate. Independent of "
+        "--visual-weight: this controls whether the signal is computed at all, not "
+        "just whether it affects ranking.",
+    )
+    visual_group.add_argument(
+        "--siglip-model",
+        default=SIGLIP_MODEL,
+        help="SigLIP model name (transformers-compatible) used for zero-shot visual-interest scoring.",
     )
 
     # --- Semantic Dedup (BGE) ---
@@ -962,11 +990,14 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
 
     # Validate monetization scoring weights
     if not args.no_monetization_scoring:
-        total_w = args.quality_weight + args.monetization_weight + args.prosody_weight
+        total_w = (
+            args.quality_weight + args.monetization_weight
+            + args.prosody_weight + args.visual_weight
+        )
         if abs(total_w - 1.0) > 1e-6:
             parser.error(
-                f"--quality-weight + --monetization-weight + --prosody-weight must sum "
-                f"to 1.0, got {total_w}"
+                f"--quality-weight + --monetization-weight + --prosody-weight + "
+                f"--visual-weight must sum to 1.0, got {total_w}"
             )
 
     # Validate watermark args
@@ -1109,8 +1140,12 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         monetization_quality_weight=args.quality_weight,
         monetization_weight=args.monetization_weight,
         prosody_weight=args.prosody_weight,
+        visual_weight=args.visual_weight,
         # Prosody Scoring
         enable_prosody_scoring=not args.no_prosody_scoring,
+        # Visual Scoring
+        enable_visual_scoring=not args.no_visual_scoring,
+        siglip_model=args.siglip_model,
         # Semantic Dedup
         enable_semantic_dedup=not args.no_semantic_dedup,
         semantic_dedup_threshold=args.semantic_dedup_threshold,

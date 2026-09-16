@@ -219,6 +219,22 @@ def run_pipeline(cfg) -> list[dict]:
         except Exception as e:
             print(f"⚠️ Prosody scoring failed: {e}. Continuing without prosody signal.")
 
+    # Step 4.46 — Visual-interest scoring (optional, feature-flagged): SigLIP
+    # zero-shot-scores a handful of sampled frames per candidate against fixed
+    # "engaging" vs "boring" text prompts — a different signal than the has_face/
+    # has_motion probe below, which is boolean and only samples the opening window.
+    if getattr(cfg, "enable_visual_scoring", True) and os.path.exists(cfg.source_video_file):
+        from .phase1.visual_scoring import score_candidates_visual
+
+        try:
+            result_json = score_candidates_visual(
+                result_json,
+                cfg.source_video_file,
+                model_name=getattr(cfg, "siglip_model", "google/siglip-base-patch16-224"),
+            )
+        except Exception as e:
+            print(f"⚠️ Visual scoring failed: {e}. Continuing without visual signal.")
+
     # Step 4.5 — Monetization scoring (optional, feature-flagged)
     from .phase1.candidate_scoring import score_candidates, write_candidates_artifact
 
@@ -245,6 +261,7 @@ def run_pipeline(cfg) -> list[dict]:
             quality_weight=getattr(cfg, "monetization_quality_weight", 0.7),
             monetization_weight=getattr(cfg, "monetization_weight", 0.3),
             prosody_weight=getattr(cfg, "prosody_weight", 0.0),
+            visual_weight=getattr(cfg, "visual_weight", 0.0),
         )
         # Re-rank by combined_score, reassign sequential rank (mirrors
         # metadata.py's own sort-then-reassign-rank pattern).
@@ -254,7 +271,8 @@ def run_pipeline(cfg) -> list[dict]:
         print(
             f"💰 Monetization scoring applied "
             f"(quality={cfg.monetization_quality_weight}, monetization={cfg.monetization_weight}, "
-            f"prosody={getattr(cfg, 'prosody_weight', 0.0)}) "
+            f"prosody={getattr(cfg, 'prosody_weight', 0.0)}, "
+            f"visual={getattr(cfg, 'visual_weight', 0.0)}) "
             f"— clips re-ranked by combined_score."
         )
 
