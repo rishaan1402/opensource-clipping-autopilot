@@ -204,6 +204,21 @@ def run_pipeline(cfg) -> list[dict]:
         except Exception as e:
             print(f"⚠️ Semantic dedup failed: {e}. Continuing with all candidates.")
 
+    # Step 4.45 — Prosody scoring (optional, feature-flagged): reads the audio-energy
+    # signal Whisper's transcription step already decoded but never persisted — needs
+    # its own WAV extraction (mirrors the diarization step's own extract_audio call
+    # below), reused across candidates rather than re-extracted per window.
+    if getattr(cfg, "enable_prosody_scoring", True) and os.path.exists(cfg.source_video_file):
+        from .phase1.prosody_scoring import score_candidates_prosody
+
+        try:
+            prosody_audio_path = cfg.source_video_file.replace(".mp4", "_prosody_audio.wav")
+            if not os.path.exists(prosody_audio_path):
+                diarization_mod.extract_audio(cfg.source_video_file, prosody_audio_path)
+            result_json = score_candidates_prosody(result_json, prosody_audio_path)
+        except Exception as e:
+            print(f"⚠️ Prosody scoring failed: {e}. Continuing without prosody signal.")
+
     # Step 4.5 — Monetization scoring (optional, feature-flagged)
     from .phase1.candidate_scoring import score_candidates, write_candidates_artifact
 
@@ -229,6 +244,7 @@ def run_pipeline(cfg) -> list[dict]:
             segment_data,
             quality_weight=getattr(cfg, "monetization_quality_weight", 0.7),
             monetization_weight=getattr(cfg, "monetization_weight", 0.3),
+            prosody_weight=getattr(cfg, "prosody_weight", 0.0),
         )
         # Re-rank by combined_score, reassign sequential rank (mirrors
         # metadata.py's own sort-then-reassign-rank pattern).
@@ -237,7 +253,8 @@ def run_pipeline(cfg) -> list[dict]:
             item["rank"] = idx + 1
         print(
             f"💰 Monetization scoring applied "
-            f"(quality={cfg.monetization_quality_weight}, monetization={cfg.monetization_weight}) "
+            f"(quality={cfg.monetization_quality_weight}, monetization={cfg.monetization_weight}, "
+            f"prosody={getattr(cfg, 'prosody_weight', 0.0)}) "
             f"— clips re-ranked by combined_score."
         )
 

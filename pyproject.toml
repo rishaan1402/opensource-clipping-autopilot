@@ -23,6 +23,8 @@ dependencies = [
     "uvicorn[standard]>=0.52.4",
     "python-multipart>=0.0.32",
     "sentence-transformers",
+    "librosa",
+    "soundfile",
 ]
 
 [project.scripts]

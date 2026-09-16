@@ -519,6 +519,25 @@ def _build_parser() -> argparse.ArgumentParser:
         default=0.3,
         help="Weight (0-1) given to the monetization score when combining with quality score.",
     )
+    mon_group.add_argument(
+        "--prosody-weight",
+        type=float,
+        default=0.0,
+        help="Weight (0-1) given to the audio-prosody score (see Prosody Scoring group) "
+        "when combining scores. Defaults to 0.0 (no-op) -- if set > 0, --quality-weight "
+        "and --monetization-weight must be reduced so all three still sum to 1.0.",
+    )
+
+    # --- Prosody Scoring (Whisper audio-energy signal) ---
+    prosody_group = p.add_argument_group("Prosody Scoring")
+    prosody_group.add_argument(
+        "--no-prosody-scoring",
+        action="store_true",
+        default=False,
+        help="Disable audio-prosody feature extraction (pitch/energy variance, pause "
+        "ratio) per candidate. Independent of --prosody-weight: this controls whether "
+        "the signal is computed at all, not just whether it affects ranking.",
+    )
 
     # --- Semantic Dedup (BGE) ---
     dedup_group = p.add_argument_group("Semantic Dedup")
@@ -943,10 +962,11 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
 
     # Validate monetization scoring weights
     if not args.no_monetization_scoring:
-        total_w = args.quality_weight + args.monetization_weight
+        total_w = args.quality_weight + args.monetization_weight + args.prosody_weight
         if abs(total_w - 1.0) > 1e-6:
             parser.error(
-                f"--quality-weight + --monetization-weight must sum to 1.0, got {total_w}"
+                f"--quality-weight + --monetization-weight + --prosody-weight must sum "
+                f"to 1.0, got {total_w}"
             )
 
     # Validate watermark args
@@ -1088,6 +1108,9 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         enable_monetization_scoring=not args.no_monetization_scoring,
         monetization_quality_weight=args.quality_weight,
         monetization_weight=args.monetization_weight,
+        prosody_weight=args.prosody_weight,
+        # Prosody Scoring
+        enable_prosody_scoring=not args.no_prosody_scoring,
         # Semantic Dedup
         enable_semantic_dedup=not args.no_semantic_dedup,
         semantic_dedup_threshold=args.semantic_dedup_threshold,

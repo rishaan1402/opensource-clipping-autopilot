@@ -132,6 +132,47 @@ class TestScoreCandidates(unittest.TestCase):
 
         self.assertAlmostEqual(item["combined_score"], expected_combined, places=9)
 
+    def test_prosody_weight_defaults_to_zero_and_is_backward_compatible(self):
+        """Omitting prosody_weight behaves exactly as before it existed."""
+        clip, segs = self._make_candidate(80, "Stop doing this mistake")
+        result = score_candidates([clip], segs, quality_weight=0.7, monetization_weight=0.3)
+        item = result[0]
+
+        expected_quality_norm = 80 / 100.0
+        expected_mon = item["monetization"]["monetization_score"]
+        expected_combined = 0.7 * expected_quality_norm + 0.3 * expected_mon
+
+        self.assertAlmostEqual(item["combined_score"], expected_combined, places=9)
+        self.assertEqual(item["scoring_weights"]["prosody"], 0.0)
+
+    def test_prosody_weight_included_in_combined_score(self):
+        """When prosody_weight > 0, prosody_score (if present) contributes to combined_score."""
+        clip, segs = self._make_candidate(80, "Stop doing this mistake", extra={"prosody_score": 0.6})
+        result = score_candidates(
+            [clip], segs, quality_weight=0.6, monetization_weight=0.3, prosody_weight=0.1
+        )
+        item = result[0]
+
+        expected_quality_norm = 80 / 100.0
+        expected_mon = item["monetization"]["monetization_score"]
+        expected_combined = 0.6 * expected_quality_norm + 0.3 * expected_mon + 0.1 * 0.6
+
+        self.assertAlmostEqual(item["combined_score"], expected_combined, places=9)
+
+    def test_prosody_score_missing_defaults_to_zero(self):
+        """No 'prosody_score' key on the candidate doesn't crash; treated as 0.0."""
+        clip, segs = self._make_candidate(80, "Stop doing this mistake")
+        result = score_candidates(
+            [clip], segs, quality_weight=0.6, monetization_weight=0.3, prosody_weight=0.1
+        )
+        item = result[0]
+
+        expected_quality_norm = 80 / 100.0
+        expected_mon = item["monetization"]["monetization_score"]
+        expected_combined = 0.6 * expected_quality_norm + 0.3 * expected_mon
+
+        self.assertAlmostEqual(item["combined_score"], expected_combined, places=9)
+
     def test_weight_validation_raises_on_bad_sum(self):
         """Weights that don't sum to 1.0 raise ValueError."""
         clip, segs = self._make_candidate(80, "Stop doing this")
@@ -183,7 +224,10 @@ class TestScoreCandidates(unittest.TestCase):
     def test_scoring_weights_recorded(self):
         clip, segs = self._make_candidate(80, "Stop doing this")
         result = score_candidates([clip], segs, quality_weight=0.6, monetization_weight=0.4)
-        self.assertEqual(result[0]["scoring_weights"], {"quality": 0.6, "monetization": 0.4})
+        self.assertEqual(
+            result[0]["scoring_weights"],
+            {"quality": 0.6, "monetization": 0.4, "prosody": 0.0},
+        )
 
     def test_missing_viral_score_defaults_to_zero(self):
         """Candidates without a viral_score don't crash; treated as 0."""

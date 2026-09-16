@@ -21,3 +21,5 @@ python-multipart
 pydantic
 edge-tts
 sentence-transformers
+librosa
+soundfile

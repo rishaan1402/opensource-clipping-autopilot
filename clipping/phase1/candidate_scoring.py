@@ -87,6 +87,7 @@ def score_candidates(
     segment_data: List[Dict],
     quality_weight: float = 0.7,
     monetization_weight: float = 0.3,
+    prosody_weight: float = 0.0,
 ) -> List[Dict]:
     """
     Attach monetization scoring + combined ranking score to each candidate.
@@ -103,8 +104,10 @@ def score_candidates(
                                 monetization.MonetizationScorer.batch_score)
         combined_score      -- quality_weight * quality_norm
                                 + monetization_weight * monetization_score
+                                + prosody_weight * prosody_score
         scoring_weights     -- {'quality': quality_weight,
-                                 'monetization': monetization_weight}
+                                 'monetization': monetization_weight,
+                                 'prosody': prosody_weight}
 
     Args:
         result_json: Candidate list as produced by
@@ -113,22 +116,28 @@ def score_candidates(
         segment_data: Transcript segments used to extract per-candidate text.
         quality_weight: Weight (0-1) for the existing AI viral_score.
         monetization_weight: Weight (0-1) for the monetization score.
+        prosody_weight: Weight (0-1) for the 'prosody_score' field, if
+            clipping.phase1.prosody_scoring.score_candidates_prosody was run
+            beforehand. Defaults to 0.0 (no-op, fully backward compatible)
+            since prosody scoring is opt-in; reads
+            clip.get('prosody_score', 0.0) defensively so this never raises
+            even if that field is absent.
 
     Returns:
         The same list, each item enriched with the fields above.
 
     Raises:
-        ValueError: if quality_weight + monetization_weight does not sum to
-            1.0 within a 1e-6 tolerance. This is a second guard in addition
-            to the CLI-level validation in clipping.config.build_config,
-            since this function can be called directly (tests, notebooks)
-            without going through the CLI.
+        ValueError: if quality_weight + monetization_weight + prosody_weight
+            does not sum to 1.0 within a 1e-6 tolerance. This is a second
+            guard in addition to the CLI-level validation in
+            clipping.config.build_config, since this function can be called
+            directly (tests, notebooks) without going through the CLI.
     """
-    total_weight = quality_weight + monetization_weight
+    total_weight = quality_weight + monetization_weight + prosody_weight
     if abs(total_weight - 1.0) > 1e-6:
         raise ValueError(
-            f"quality_weight + monetization_weight must sum to 1.0, "
-            f"got {quality_weight} + {monetization_weight} = {total_weight}"
+            f"quality_weight + monetization_weight + prosody_weight must sum to 1.0, "
+            f"got {quality_weight} + {monetization_weight} + {prosody_weight} = {total_weight}"
         )
 
     for clip in result_json:
@@ -137,6 +146,7 @@ def score_candidates(
 
         viral_score = float(clip.get("viral_score", 0))
         quality_norm = viral_score / 100.0
+        prosody_norm = float(clip.get("prosody_score", 0.0))
 
         clip["quality_score_raw"] = viral_score
         clip["quality_score_norm"] = quality_norm
@@ -155,10 +165,12 @@ def score_candidates(
         clip["combined_score"] = (
             quality_weight * quality_norm
             + monetization_weight * metrics.monetization_score
+            + prosody_weight * prosody_norm
         )
         clip["scoring_weights"] = {
             "quality": quality_weight,
             "monetization": monetization_weight,
+            "prosody": prosody_weight,
         }
 
     return result_json
