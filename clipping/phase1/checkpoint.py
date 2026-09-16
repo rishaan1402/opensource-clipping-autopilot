@@ -58,9 +58,9 @@ class CheckpointManager:
                     f"discarding stale checkpoint state."
                 )
                 print(
-                    f"⚠️  Sumber video berbeda dari checkpoint sebelumnya "
+                    f"⚠️  Video source differs from the previous checkpoint "
                     f"({old_key!r} -> {source_key!r}). "
-                    f"Checkpoint lama dihapus untuk mencegah transkrip/klip yang salah."
+                    f"Old checkpoint discarded to prevent an incorrect transcript/clip."
                 )
             self.state = {
                 'created_at': datetime.now().isoformat(),
@@ -178,7 +178,7 @@ class StepValidator:
     @staticmethod
     def validate_download(output_dir: str) -> bool:
         """Check if video was downloaded."""
-        video_path = os.path.join(output_dir, 'video_asli.mp4')
+        video_path = os.path.join(output_dir, 'source_video.mp4')
         return os.path.isfile(video_path)
 
     @staticmethod

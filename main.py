@@ -27,14 +27,14 @@ def main():
         print("=" * 70)
         print(f"   Recipe      : {cfg.story_recipe_path}")
         print(f"   Sources     : {cfg.sources_json_path}")
-        print(f"   Rasio       : {cfg.pilihan_rasio}")
+        print(f"   Ratio       : {cfg.aspect_ratio}")
         print(f"   Output Dir  : {cfg.story_output_dir}")
         print(f"   Skip DL     : {'YES' if cfg.skip_download else 'NO'}")
         print("=" * 70)
 
         run_story_pipeline(cfg)
 
-        print("\n✅ Selesai! Semua story clips telah dirender.")
+        print("\n✅ Done! All story clips have been rendered.")
         return
 
     # ── Batch Mode ───────────────────────────────────────────────────
@@ -44,8 +44,8 @@ def main():
         from clipping.phase1.batch_runner import run_batch, write_batch_report, print_batch_summary
 
         if not cfg.api_key_gemini:
-            print("❌ ERROR: GOOGLE_API_KEY environment variable tidak ditemukan.")
-            print("   Set via: export GOOGLE_API_KEY='your-key' atau buat file .env")
+            print("❌ ERROR: GOOGLE_API_KEY environment variable not found.")
+            print("   Set via: export GOOGLE_API_KEY='your-key' or create a .env file")
             sys.exit(1)
 
         print("=" * 70)
@@ -81,8 +81,8 @@ def main():
     from clipping.runner import run_pipeline
 
     if not cfg.api_key_gemini:
-        print("❌ ERROR: GOOGLE_API_KEY environment variable tidak ditemukan.")
-        print("   Set via: export GOOGLE_API_KEY='your-key' atau buat file .env")
+        print("❌ ERROR: GOOGLE_API_KEY environment variable not found.")
+        print("   Set via: export GOOGLE_API_KEY='your-key' or create a .env file")
         sys.exit(1)
 
     _PLATFORM_LABELS = {
@@ -98,10 +98,10 @@ def main():
     print(f"🎬 OpenSource Clipping v{version}")
     print("=" * 70)
     print(f"   Source      : {platform_label}")
-    print(f"   URL         : {cfg.url_youtube}")
-    print(f"   Jumlah Clip : {cfg.jumlah_clip}")
-    print(f"   Rasio       : {cfg.pilihan_rasio}")
-    print(f"   Font Style  : {cfg.gaya_font_aktif}")
+    print(f"   URL         : {cfg.source_url}")
+    print(f"   Clip Count  : {cfg.clip_count}")
+    print(f"   Ratio       : {cfg.aspect_ratio}")
+    print(f"   Font Style  : {cfg.active_font_style}")
     print(f"   Subtitles   : {'OFF' if cfg.no_subs else 'ON'}")
     print(f"   B-Roll      : {'ON' if cfg.use_broll else 'OFF'}")
     print(f"   Hook Glitch : {'ON' if cfg.use_hook_glitch else 'OFF'}")
@@ -130,7 +130,7 @@ def main():
 
     run_pipeline(cfg)
 
-    print("\n✅ Selesai! Semua klip telah dirender.")
+    print("\n✅ Done! All clips have been rendered.")
 
 
 if __name__ == "__main__":

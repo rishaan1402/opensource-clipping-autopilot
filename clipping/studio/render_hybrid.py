@@ -55,12 +55,12 @@ crop_center_broll = broll.crop_center_broll
 face_detection = _load_studio_internal_module("face_detection.py", "clipping_studio_face_detection")
 get_face_detector = face_detection.get_face_detector
 
-def buat_video_hybrid(
+def create_video_hybrid(
     input_video,
     output_video,
     start_clip,
     end_clip,
-    rasio,
+    ratio,
     cfg,
     broll_data=None,
     label="Hybrid",
@@ -73,7 +73,7 @@ def buat_video_hybrid(
         output_video (str): Output video file path.
         start_clip (float): Start timestamp in seconds.
         end_clip (float): End timestamp in seconds.
-        rasio (str): Output ratio string ('9:16' or '16:9').
+        ratio (str): Output ratio string ('9:16' or '16:9').
         cfg: Configuration object for parameters like deadzones and smoothing factors.
         broll_data (list, optional): Metadata dicts of B-roll timing to overlay.
         label (str, optional): The UI label used for rendering progress output.
@@ -92,25 +92,25 @@ def buat_video_hybrid(
         broll_data = []
 
     # =======================================================
-    # 🎛️ PARAMETER TUNING KAMERA
+    # 🎛️ CAMERA TUNING PARAMETERS
     # =======================================================
-    STEP_DETEKSI     = cfg.track_step if cfg.track_step is not None else 0.25   # AI mengecek wajah tiap 0.25 detik
-    # STEP_DETEKSI     = 0.5   # AI mengecek wajah tiap 0.5 detik
-    # STEP_DETEKSI     = max(0.5, (end_clip - start_clip) / 60.0)   # [OLD] AI mengecek wajah tiap max 0.5 atau sepanjang durasi (end_clip - start_clip) detik per menit
+    STEP_DETECTION     = cfg.track_step if cfg.track_step is not None else 0.25   # AI checks face every 0.25 seconds
+    # STEP_DETECTION     = 0.5   # AI checks face every 0.5 seconds
+    # STEP_DETECTION     = max(0.5, (end_clip - start_clip) / 60.0)   # [OLD] AI checks face every max 0.5 or duration (end_clip - start_clip) seconds per minute
 
-    DEADZONE_RATIO   = cfg.track_deadzone if cfg.track_deadzone is not None else 0.15  # 15% area tengah adalah zona aman (kamera tidak ikut gerak)
-    # DEADZONE_RATIO   = 0.25  # 25% area tengah adalah zona aman (kamera tidak ikut gerak)
-    # DEADZONE_RATIO   = 0.20  # [OLD] 20% area tengah adalah zona aman (kamera tidak ikut gerak)
+    DEADZONE_RATIO   = cfg.track_deadzone if cfg.track_deadzone is not None else 0.15  # 15% center area is the safe zone (camera doesn't follow movement)
+    # DEADZONE_RATIO   = 0.25  # 25% center area is the safe zone (camera doesn't follow movement)
+    # DEADZONE_RATIO   = 0.20  # [OLD] 20% center area is the safe zone (camera doesn't follow movement)
 
-    SMOOTH_FACTOR    = cfg.track_smooth if cfg.track_smooth is not None else 0.30  # Kecepatan kamera menyusul (30% jarak). Bikin pergerakan sangat mulus.
-    # SMOOTH_FACTOR    = 0.15  # Kecepatan kamera menyusul (15% jarak). Bikin pergerakan sangat mulus.
-    # SMOOTH_FACTOR    = 0.10  # [NEW; NOT USED]Kecepatan kamera menyusul (10% jarak). Bikin pergerakan sangat mulus.
+    SMOOTH_FACTOR    = cfg.track_smooth if cfg.track_smooth is not None else 0.30  # Camera catch-up speed (30% of distance). Makes movement very smooth.
+    # SMOOTH_FACTOR    = 0.15  # Camera catch-up speed (15% of distance). Makes movement very smooth.
+    # SMOOTH_FACTOR    = 0.10  # [NEW; NOT USED] Camera catch-up speed (10% of distance). Makes movement very smooth.
 
-    JITTER_THRESHOLD = cfg.track_jitter if cfg.track_jitter is not None else 5     # Abaikan pergeseran di bawah 5 pixel (Anti-getar/Micro-jitter)
-    # JITTER_THRESHOLD = 4     # [OLD] Abaikan pergeseran di bawah 4 pixel (Anti-getar/Micro-jitter)
+    JITTER_THRESHOLD = cfg.track_jitter if cfg.track_jitter is not None else 5     # Ignore shifts below 5 pixels (anti-jitter/micro-jitter)
+    # JITTER_THRESHOLD = 4     # [OLD] Ignore shifts below 4 pixels (anti-jitter/micro-jitter)
 
-    SNAP_THRESHOLD   = cfg.track_snap if cfg.track_snap is not None else 0.25  # Jika wajah lompat > 25% lebar layar, anggap ganti orang (Hard Cut)
-    # SNAP_THRESHOLD   = 0.30  # [NEW; NOT USED] Jika wajah lompat > 30% lebar layar, anggap ganti orang (Hard Cut)
+    SNAP_THRESHOLD   = cfg.track_snap if cfg.track_snap is not None else 0.25  # If face jumps > 25% of screen width, assume person change (hard cut)
+    # SNAP_THRESHOLD   = 0.30  # [NEW; NOT USED] If face jumps > 30% of screen width, assume person change (hard cut)
     # =======================================================
 
     video_encoder = detect_video_encoder(cfg)
@@ -119,7 +119,7 @@ def buat_video_hybrid(
     detector = None
     if cfg.face_detector == "yolo":
         if not os.path.exists(cfg.file_yolo_model):
-            print(f"   📥 Mendownload YOLOv8 Face Model ({cfg.yolo_size})...")
+            print(f"   📥 Downloading YOLOv8 Face Model ({cfg.yolo_size})...")
             import urllib.request
 
             urllib.request.urlretrieve(cfg.url_yolo_model, cfg.file_yolo_model)
@@ -138,8 +138,8 @@ def buat_video_hybrid(
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Dynamic crop dimensions based on target ratio
-    w_part, h_part = RATIO_MAP.get(rasio, (16, 9))
-    if _is_vertical_ratio(rasio):
+    w_part, h_part = RATIO_MAP.get(ratio, (16, 9))
+    if _is_vertical_ratio(ratio):
         crop_w = int(height * w_part / h_part)
         crop_h = height
     else:
@@ -160,17 +160,17 @@ def buat_video_hybrid(
                 }
             )
 
-    # FASE 1: DETEKSI WAJAH
+    # PHASE 1: FACE DETECTION
     raw_data = []
     current_time = 0.0
     last_detect_percent = -1
-    
-    skip_tracking = getattr(cfg, "static_crop", False) and rasio in ["1:1", "3:4", "4:5"]
+
+    skip_tracking = getattr(cfg, "static_crop", False) and ratio in ["1:1", "3:4", "4:5"]
 
     if skip_tracking:
-        print(f"🧠 {label} - Static Crop aktif (tanpa face tracking)...", flush=True)
+        print(f"🧠 {label} - Static crop active (no face tracking)...", flush=True)
     else:
-        print(f"🧠 {label} - Analisa wajah dimulai...", flush=True)
+        print(f"🧠 {label} - Face analysis starting...", flush=True)
 
     while current_time <= duration and not skip_tracking:
         cap.set(cv2.CAP_PROP_POS_MSEC, (start_clip + current_time) * 1000)
@@ -226,12 +226,12 @@ def buat_video_hybrid(
             min(100, int((current_time / duration) * 100)) if duration > 0 else 100
         )
         if detect_percent != last_detect_percent:
-            print(f"⏳ {label} - Analisa wajah: {detect_percent:3d}%", flush=True)
+            print(f"⏳ {label} - Face analysis: {detect_percent:3d}%", flush=True)
             last_detect_percent = detect_percent
 
-        current_time += STEP_DETEKSI
+        current_time += STEP_DETECTION
 
-    # FASE 2: SMOOTH CAMERA
+    # PHASE 2: SMOOTH CAMERA
     smooth_data = []
     if raw_data:
         import statistics as _st
@@ -317,11 +317,11 @@ def buat_video_hybrid(
         secs = int(s % 60)
         return f"{mins:02d}:{secs:02d}"
 
-    # FASE 3: RENDER FRAME
-    base_out_w, base_out_h = _get_render_dims(cfg, rasio, source_h=height)
+    # PHASE 3: FRAME RENDERING
+    base_out_w, base_out_h = _get_render_dims(cfg, ratio, source_h=height)
     
     # DEV MODE: Force 16:9 to show context or 2648 ultrawide for merge
-    dev_visualize = cfg.dev_mode and _is_vertical_ratio(rasio)
+    dev_visualize = cfg.dev_mode and _is_vertical_ratio(ratio)
     merge_output = dev_visualize and getattr(cfg, "dev_mode_with_output_merge", False)
     
     if merge_output:
@@ -343,7 +343,7 @@ def buat_video_hybrid(
         frame_count = 0
         last_render_percent = -1
 
-        print(f"🎬 {label} - Render frame dimulai...", flush=True)
+        print(f"🎬 {label} - Frame rendering starting...", flush=True)
 
         while True:
             ret, frame_utama = cap.read()
@@ -357,7 +357,7 @@ def buat_video_hybrid(
             waktu_absolut = start_clip + t
 
             # --- 1. ALWAYS CREATE CROPPED OUTPUT ---
-            if _is_vertical_ratio(rasio):
+            if _is_vertical_ratio(ratio):
                 # Vertical/square ratios: face-tracked crop
                 cx_base, cy_base = _get_pos(t)
                 x1_crop = int(max(0, min(cx_base - crop_w // 2, width - crop_w)))
@@ -401,7 +401,7 @@ def buat_video_hybrid(
 
             # --- 2. CREATE DEV CONTEXT FRAME IF ACTIVE ---
             frame_dev = None
-            if dev_visualize and _is_vertical_ratio(rasio):
+            if dev_visualize and _is_vertical_ratio(ratio):
                 frame_base = _resize_frame(frame_utama, (1920, 1080))
                 frame_dev = (frame_base * 0.35).astype(np.uint8)
                 
@@ -443,7 +443,7 @@ def buat_video_hybrid(
                 hud_lines = [
                     f"MODE: HYBRID STANDARD (DEV)",
                     f"TIME: {format_seconds(t)}",
-                    f"LAYOUT: FULL {rasio}",
+                    f"LAYOUT: FULL {ratio}",
                     f"ANCHOR CX: {int(cx_base)}"
                 ]
                 for i, line in enumerate(hud_lines):
@@ -519,9 +519,9 @@ def buat_video_hybrid(
         return_code = writer.wait()
 
         if return_code != 0:
-            raise RuntimeError(f"FFmpeg writer gagal: {stderr_data[-1000:]}")
+            raise RuntimeError(f"FFmpeg writer failed: {stderr_data[-1000:]}")
 
-        print(f"✅ {label} selesai.", flush=True)
+        print(f"✅ {label} complete.", flush=True)
 
     finally:
         cap.release()

@@ -94,7 +94,7 @@ def _run_clip_stage(remaining_argv: list[str]) -> str:
     cfg = build_config(remaining_argv)
 
     if not cfg.api_key_gemini:
-        print("❌ ERROR: GOOGLE_API_KEY environment variable tidak ditemukan.")
+        print("❌ ERROR: GOOGLE_API_KEY environment variable not found.")
         sys.exit(1)
 
     if getattr(cfg, "story_mode", False):
@@ -118,7 +118,7 @@ def _run_clip_stage(remaining_argv: list[str]) -> str:
         return None
 
     from clipping.runner import run_pipeline
-    print(f"🎬 Autopilot: Clipping {cfg.url_youtube}")
+    print(f"🎬 Autopilot: Clipping {cfg.source_url}")
     run_pipeline(cfg)
     return os.path.join(cfg.outputs_dir, "render_manifest.json")
 
@@ -206,7 +206,7 @@ def main() -> None:
         if args.upload_facebook:
             _run_facebook_upload(args, manifest_path)
 
-    print("\n✅ Autopilot selesai.")
+    print("\n✅ Autopilot complete.")
 
 
 if __name__ == "__main__":

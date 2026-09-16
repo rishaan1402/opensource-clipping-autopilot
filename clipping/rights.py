@@ -142,7 +142,7 @@ def fetch_youtube_license_status(video_id: str, api_key: str) -> Optional[str]:
             return None
         return items[0].get("status", {}).get("license")
     except Exception as exc:  # noqa: BLE001 — surfaced by caller, not swallowed
-        print(f"⚠️  Gagal verifikasi lisensi YouTube untuk {video_id}: {exc}")
+        print(f"⚠️  Failed to verify YouTube license for {video_id}: {exc}")
         return None
 
 
@@ -179,7 +179,7 @@ def enforce_source_rights_or_raise(cfg, source_info: SourceInfo) -> None:
                 "'creativeCommon'. Refusing to process — the license may have "
                 "been changed after this source was queued."
             )
-        print(f"   ✅ Lisensi Creative Commons terverifikasi untuk video {video_id}.")
+        print(f"   ✅ Creative Commons license verified for video {video_id}.")
 
         # A single CC-tagged video isn't enough signal on its own — see
         # clipping/channel_trust.py's docstring for why (compilation/repost
@@ -227,7 +227,7 @@ def enforce_source_rights_or_raise(cfg, source_info: SourceInfo) -> None:
                 "CLI-parse time."
             )
         print(
-            f"   ✅ Izin kreator terverifikasi: '{record['channel_name']}' "
+            f"   ✅ Creator permission verified: '{record['channel_name']}' "
             f"(revenue share: {record['revenue_share_pct']}%)."
         )
 

@@ -20,9 +20,9 @@ except ImportError:
 # ==============================================================================
 # AVAILABLE EDGE-TTS VOICES (REFERENCE)
 # ==============================================================================
-# Daftar voice edge-tts yang tersedia untuk referensi.
-# Gunakan value (string voice name) sebagai argumen `voice` di synthesize_voice().
-# Jalankan `edge-tts --list-voices` untuk daftar lengkap.
+# List of available edge-tts voices for reference.
+# Use the value (voice name string) as the `voice` argument in synthesize_voice().
+# Run `edge-tts --list-voices` for the full list.
 # GitHub: https://github.com/rany2/edge-tts
 # Preview: https://geeksta.net/tools/tts-samples/
 # Sample in git: https://github.com/yaph/tts-samples/blob/main/mp3/English/en-US-GuyNeural.mp3
@@ -33,10 +33,10 @@ AVAILABLE_VOICES = {
             "id-ID-ArdiNeural",
             "id-ID-GadisNeural",       # Note: despite name, check output
             "id-ID-ArdiNeural",         # Primary Indonesian male
-            # Edge-TTS hanya menyediakan 2 voice ID Indonesia (Ardi & Gadis).
-            # Alternatif Melayu (ms-MY) bisa digunakan untuk variasi:
-            "ms-MY-OsmanNeural",        # Malay male (mirip ID)
-            "ms-MY-YasminNeural",       # Malay female (mirip ID)
+            # Edge-TTS only provides 2 Indonesian voice IDs (Ardi & Gadis).
+            # Malay alternatives (ms-MY) can be used for variety:
+            "ms-MY-OsmanNeural",        # Malay male (similar to ID)
+            "ms-MY-YasminNeural",       # Malay female (similar to ID)
             "jv-ID-DimasNeural",        # Javanese male
         ],
         "female": [
@@ -194,10 +194,10 @@ def get_commentary_prompt(
             "\nATURAN TAMBAHAN (WAJIB — konten sumber tidak berlisensi/tanpa izin eksplisit, "
             "video ini HARUS berdiri sebagai komentar orisinal, bukan sekadar narasi ulang):\n"
             "- Berikan kritik, analisis, atau sudut pandang yang SECARA SUBSTANSIAL baru — "
-            "bukan parafrase dari apa yang dikatakan di klip.\n"
-            "- Rujuk isi klip secukupnya untuk memberi konteks pada komentarmu, tapi inti video "
+            "bukan parafrase dari apa yang dikatakan di clip.\n"
+            "- Rujuk isi clip secukupnya untuk memberi konteks pada komentarmu, tapi inti video "
             "ini harus berupa opinimu, bukan isi aslinya.\n"
-            "- Hindari sekadar mendeskripsikan ulang kejadian di klip kata demi kata."
+            "- Hindari sekadar mendeskripsikan ulang kejadian di clip kata demi kata."
         )
         if language == "en":
             strict_instruction = (
@@ -240,7 +240,7 @@ TRANSKRIP KLIP:
 {transcript_snippet}
 \"\"\"
 
-SCRIPT VOICE-OVER (Hanya teks yang dibacakan, tanpa tanda kutip di awal/akhir):"""
+SCRIPT VOICE-OVER (Hanya text_str yang dibacakan, tanpa tanda kutip di awal/akhir):"""
     return prompt
 
 def generate_commentary_script(
@@ -251,7 +251,7 @@ def generate_commentary_script(
 
     api_key = cfg.api_key_gemini
     if not api_key:
-        raise ValueError("GOOGLE_API_KEY tidak ditemukan di environment atau config.")
+        raise ValueError("GOOGLE_API_KEY not found in environment or config.")
 
     client = genai.Client(api_key=api_key)
     prompt = get_commentary_prompt(transcript_snippet, style, language, length, strict_commentary)

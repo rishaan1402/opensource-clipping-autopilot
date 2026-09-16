@@ -59,7 +59,7 @@ class TestCheckpointManager(unittest.TestCase):
         same outputs_dir must see previously completed steps."""
         ckpt1 = CheckpointManager(self.output_dir)
         ckpt1.mark_step_complete("download", {"file": "video.mp4"})
-        ckpt1.mark_step_complete("transcribe", {"transkrip_lengkap": "hello", "data_segmen": []})
+        ckpt1.mark_step_complete("transcribe", {"full_transcript": "hello", "segment_data": []})
 
         # Fresh instance — simulates resuming after a crash
         ckpt2 = CheckpointManager(self.output_dir)
@@ -132,7 +132,7 @@ class TestStepValidator(unittest.TestCase):
         self.assertFalse(StepValidator.validate_download(self.output_dir))
 
     def test_validate_download_present_file(self):
-        open(os.path.join(self.output_dir, "video_asli.mp4"), "w").close()
+        open(os.path.join(self.output_dir, "source_video.mp4"), "w").close()
         self.assertTrue(StepValidator.validate_download(self.output_dir))
 
     def test_validate_rendered_clips_none_present(self):

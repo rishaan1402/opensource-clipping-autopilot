@@ -50,14 +50,14 @@ _is_vertical_ratio = utils._is_vertical_ratio
 typography = _load_studio_internal_module("typography.py", "clipping_studio_typography")
 download_google_font = typography.download_google_font
 register_fonts_for_libass = typography.register_fonts_for_libass
-siapkan_font_tipografi = typography.siapkan_font_tipografi
+prepare_typography_font = typography.prepare_typography_font
 
-def buat_file_ass(
-    data_segmen,
+def create_ass_file(
+    segment_data,
     start_clip,
     end_clip,
     nama_file_ass,
-    rasio,
+    ratio,
     cfg,
     typography_plan=None,
     gunakan_advanced=True,
@@ -68,11 +68,11 @@ def buat_file_ass(
     Build and write an Advanced SubStation Alpha (ASS) subtitle file for a video clip.
 
     Args:
-        data_segmen (list): A list of dictionaries containing transcript segments and their timing.
+        segment_data (list): A list of dictionaries containing transcript segments and their timing.
         start_clip (float): The starting timestamp of the clip in the original video (in seconds).
         end_clip (float): The ending timestamp of the clip in the original video (in seconds).
         nama_file_ass (str): The destination file path to save the generated ASS file.
-        rasio (str): The target aspect ratio ('9:16' or '16:9').
+        ratio (str): The target aspect ratio ('9:16' or '16:9').
         cfg: Runtime configuration object specifying styling, fonts, and render settings.
         typography_plan (list, optional): A list of dictionaries specifying emphasis and animation for specific words. Defaults to None.
         gunakan_advanced (bool, optional): Whether to use advanced positioning and animations. Defaults to True.
@@ -93,7 +93,7 @@ def buat_file_ass(
 
     typo_dict = {}
     for plan in typography_plan:
-        clean_word = plan.get("kata_utama", "").lower().strip(string.punctuation)
+        clean_word = plan.get("emphasis_word", "").lower().strip(string.punctuation)
         typo_dict[clean_word] = plan
 
     pakai_advanced = cfg.use_advanced_text and gunakan_advanced
@@ -102,20 +102,20 @@ def buat_file_ass(
     outline_val = 3 if pakai_karaoke else 0.2
     shadow_val = 2.5 if pakai_karaoke else 0.2
 
-    daftar_font = cfg.daftar_font
-    gaya = cfg.gaya_font_aktif
+    font_list = cfg.font_list
+    style = cfg.active_font_style
     font_dir = cfg.font_dir
 
-    font_utama_dict = daftar_font[gaya]["utama"]
-    font_khusus_dict = daftar_font[gaya]["khusus"]
+    font_utama_dict = font_list[style]["primary"]
+    font_khusus_dict = font_list[style]["accent"]
 
     font_utama = font_utama_dict["nama"]
     font_khusus = font_khusus_dict["nama"]
 
     scale_base_khusus = (
-        cfg.scale_kata_khusus_916 if _is_vertical_ratio(rasio) else cfg.scale_kata_khusus_169
+        cfg.scale_accent_word_916 if _is_vertical_ratio(ratio) else cfg.scale_accent_word_169
     )
-    warna_khusus = cfg.warna_kata_khusus
+    warna_khusus = cfg.accent_word_color
 
     def get_scale_value(level):
         if level == 3:
@@ -128,19 +128,19 @@ def buat_file_ass(
     def fmt_time(d):
         return f"{int(d // 3600)}:{int((d % 3600) // 60):02d}:{int(d % 60):02d}.{int((d - int(d)) * 100):02d}"
 
-    play_res_x, play_res_y = _get_render_dims(cfg, rasio, source_h=source_dim[1] if source_dim else 1080)
+    play_res_x, play_res_y = _get_render_dims(cfg, ratio, source_h=source_dim[1] if source_dim else 1080)
     
     # Calculate scale relative to standard 1080p vertical (1920 height)
     # This ensures typography looks consistent across different render resolutions
-    scale_factor = play_res_y / (1920 if _is_vertical_ratio(rasio) else 1080)
-    if rasio == "split":
+    scale_factor = play_res_y / (1920 if _is_vertical_ratio(ratio) else 1080)
+    if ratio == "split":
         align = 5
         margin_v = 0
     else:
-        align = cfg.ass_align_916 if _is_vertical_ratio(rasio) else cfg.ass_align_169
-        margin_v = int((cfg.ass_margin_916 if _is_vertical_ratio(rasio) else cfg.ass_margin_169) * scale_factor)
-    font_sz = int((cfg.ass_font_916 if _is_vertical_ratio(rasio) else cfg.ass_font_169) * scale_factor)
-    margin_lr = int((60 if _is_vertical_ratio(rasio) else 40) * scale_factor)
+        align = cfg.ass_align_916 if _is_vertical_ratio(ratio) else cfg.ass_align_169
+        margin_v = int((cfg.ass_margin_916 if _is_vertical_ratio(ratio) else cfg.ass_margin_169) * scale_factor)
+    font_sz = int((cfg.ass_font_916 if _is_vertical_ratio(ratio) else cfg.ass_font_169) * scale_factor)
+    margin_lr = int((60 if _is_vertical_ratio(ratio) else 40) * scale_factor)
 
     header = (
         f"[Script Info]\n"
@@ -163,7 +163,7 @@ def buat_file_ass(
     if not pakai_advanced:
         with open(nama_file_ass, "w", encoding="utf-8") as f:
             f.write(header)
-            for seg in data_segmen:
+            for seg in segment_data:
                 seg_s = max(0, seg["start"] - start_clip)
                 seg_e = min(end_clip - start_clip, seg["end"] - start_clip)
                 if seg_s >= seg_e:
@@ -213,7 +213,7 @@ def buat_file_ass(
             f_path = os.path.join(font_dir, f_file)
 
             if not cek_font_di_folder(f_file):
-                raise FileNotFoundError(f"Font tidak ditemukan: {f_path}")
+                raise FileNotFoundError(f"Font not found: {f_path}")
 
             font_cache[key] = ImageFont.truetype(
                 f_path,
@@ -233,7 +233,7 @@ def buat_file_ass(
     with open(nama_file_ass, "w", encoding="utf-8") as f:
         f.write(header)
 
-        for seg in data_segmen:
+        for seg in segment_data:
             seg_s = max(0, seg["start"] - start_clip)
             seg_e = min(end_clip - start_clip, seg["end"] - start_clip)
             if seg_s >= seg_e:
@@ -249,9 +249,9 @@ def buat_file_ass(
                 plan = typo_dict.get(word_clean)
 
                 if plan:
-                    w_style = plan.get("style", "khusus")
+                    w_style = plan.get("style", "accent")
                     w_scale = get_scale_value(plan.get("scale_level", 2))
-                    is_khusus = w_style == "khusus"
+                    is_khusus = w_style == "accent"
 
                     pil_font = get_cached_font(is_khusus, w_scale)
                     raw_w = (
@@ -309,7 +309,7 @@ def buat_file_ass(
             total_stack_h = (
                 sum(l["height"] for l in lines) + (len(lines) - 1) * line_spacing
             )
-            if rasio == "split":
+            if ratio == "split":
                 current_y = (play_res_y - total_stack_h) / 2
             else:
                 current_y = play_res_y - margin_v - total_stack_h
@@ -334,13 +334,13 @@ def buat_file_ass(
                     w_end_ms = int((w_data["end"] - seg_s) * 1000)
 
                     if w_data["plan"]:
-                        w_style = w_data["plan"].get("style", "khusus")
-                        w_anim = w_data["plan"].get("animasi", "bounce_pop")
+                        w_style = w_data["plan"].get("style", "accent")
+                        w_anim = w_data["plan"].get("animation", "bounce_pop")
                         target_scale = get_scale_value(
                             w_data["plan"].get("scale_level", 2)
                         )
                         font_info = (
-                            font_khusus_dict if w_style == "khusus" else font_utama_dict
+                            font_khusus_dict if w_style == "accent" else font_utama_dict
                         )
                         f_tag = build_font_tag(font_info)
                         c_tag = f"\\c{warna_khusus}"

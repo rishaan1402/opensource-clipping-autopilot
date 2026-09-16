@@ -27,7 +27,7 @@ def _load_studio_internal_module(file_name: str, module_alias: str):
     module_path = os.path.join(os.path.dirname(__file__), "studio", file_name)
     spec = importlib.util.spec_from_file_location(module_alias, module_path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"Gagal memuat modul internal: {module_path}")
+        raise ImportError(f"Failed to load internal module: {module_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -51,22 +51,22 @@ quick_face_motion_probe = _core.quick_face_motion_probe
 estimate_speaker_count_from_video = _core.estimate_speaker_count_from_video
 download_google_font = _core.download_google_font
 register_fonts_for_libass = _core.register_fonts_for_libass
-siapkan_font_tipografi = _core.siapkan_font_tipografi
+prepare_typography_font = _core.prepare_typography_font
 get_local_bgm_file = _core.get_local_bgm_file
 build_bgm_filter = _core.build_bgm_filter
 download_pexels_broll = _core.download_pexels_broll
 crop_center_broll = _core.crop_center_broll
-buat_video_hybrid = _core.buat_video_hybrid
-buat_file_ass = _core.buat_file_ass
-siapkan_glitch_video = _core.siapkan_glitch_video
+create_video_hybrid = _core.create_video_hybrid
+create_ass_file = _core.create_ass_file
+prepare_glitch_video = _core.prepare_glitch_video
 download_transition_raw = _core.download_transition_raw
 download_all_transitions = _core.download_all_transitions
 get_random_transition = _core.get_random_transition
 prepare_transition_clip = _core.prepare_transition_clip
 TMP_TRANSITION_POOL = _core.TMP_TRANSITION_POOL
-buat_thumbnail = _core.buat_thumbnail
-buat_video_split_screen = _core.buat_video_split_screen
-buat_video_camera_switch = _core.buat_video_camera_switch
+create_thumbnail = _core.create_thumbnail
+create_video_split_screen = _core.create_video_split_screen
+create_video_camera_switch = _core.create_video_camera_switch
 _get_render_dims = _core._get_render_dims
 _is_vertical_ratio = _core._is_vertical_ratio
-proses_klip = _core.proses_klip
+process_clip = _core.process_clip

@@ -68,16 +68,16 @@ def main():
         os.makedirs(creds_dir, exist_ok=True)
 
     if not os.path.exists(args.token_file):
-        print(f"❌ ERROR: File kredensial tidak ditemukan di '{args.token_file}'.")
-        print(f"   Mohon tempatkan file 'youtube_token.json' di dalam folder '{creds_dir}'.")
+        print(f"❌ ERROR: Credentials file not found at '{args.token_file}'.")
+        print(f"   Please place the 'youtube_token.json' file inside the '{creds_dir}' folder.")
         sys.exit(1)
 
     safety_config = load_safety_config(args.safety_config)
 
     if args.no_approval:
-        print("\n⚠️  WARNING: Manual approval dinonaktifkan (--no-approval).")
-        print("   Semua video akan langsung diupload tanpa konfirmasi.")
-        print("   Ini TIDAK DIREKOMENDASIKAN untuk channel yang pernah kena ban.\n")
+        print("\n⚠️  WARNING: Manual approval disabled (--no-approval).")
+        print("   All videos will be uploaded immediately without confirmation.")
+        print("   This is NOT RECOMMENDED for channels that have been banned before.\n")
 
     upload_manifest_to_youtube(
         token_file=args.token_file,
@@ -92,7 +92,7 @@ def main():
         skip_approval=args.no_approval,
     )
 
-    print("\n✅ Proses upload YouTube selesai.")
+    print("\n✅ YouTube upload process complete.")
 
 
 if __name__ == "__main__":

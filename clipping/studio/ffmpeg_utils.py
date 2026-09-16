@@ -296,7 +296,7 @@ def run_ffmpeg_with_progress(ffmpeg_cmd, total_duration, label="Render"):
         Tuple `(return_code, recent_errors)` where `recent_errors` contains
         the latest non-progress stderr lines.
     """
-    print(f"🚀 {label} dimulai...", flush=True)
+    print(f"🚀 {label} starting...", flush=True)
 
     process = subprocess.Popen(
         ffmpeg_cmd,

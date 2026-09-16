@@ -30,8 +30,8 @@ from clipping.phase1.batch_runner import (
 def _make_base_cfg(outputs_dir: str):
     return SimpleNamespace(
         outputs_dir=outputs_dir,
-        file_video_asli=os.path.join(outputs_dir, "video_asli.mp4"),
-        url_youtube=None,
+        source_video_file=os.path.join(outputs_dir, "source_video.mp4"),
+        source_url=None,
         source_platform="youtube",
         font_dir="/shared/fonts",
         base_dir="/project",
@@ -78,7 +78,7 @@ class TestBuildItemConfig(unittest.TestCase):
         cfg2 = build_item_config(self.base_cfg, source2, 2)
 
         self.assertNotEqual(cfg1.outputs_dir, cfg2.outputs_dir)
-        self.assertNotEqual(cfg1.file_video_asli, cfg2.file_video_asli)
+        self.assertNotEqual(cfg1.source_video_file, cfg2.source_video_file)
 
     def test_does_not_mutate_base_cfg(self):
         source = InputSource(source="https://youtube.com/watch?v=a", title="Video A")
@@ -87,7 +87,7 @@ class TestBuildItemConfig(unittest.TestCase):
         build_item_config(self.base_cfg, source, 1)
 
         self.assertEqual(self.base_cfg.outputs_dir, original_outputs_dir)
-        self.assertIsNone(self.base_cfg.url_youtube)
+        self.assertIsNone(self.base_cfg.source_url)
 
     def test_item_dir_created_on_disk(self):
         source = InputSource(source="https://youtube.com/watch?v=a", title="Video A")
@@ -104,13 +104,13 @@ class TestBuildItemConfig(unittest.TestCase):
     def test_url_youtube_set_per_item(self):
         source = InputSource(source="https://youtube.com/watch?v=xyz", title="Video")
         cfg = build_item_config(self.base_cfg, source, 1)
-        self.assertEqual(cfg.url_youtube, "https://youtube.com/watch?v=xyz")
+        self.assertEqual(cfg.source_url, "https://youtube.com/watch?v=xyz")
 
     def test_local_file_source_points_directly_at_file(self):
         with tempfile.NamedTemporaryFile(suffix=".mp4") as f:
             source = InputSource(source=f.name)
             cfg = build_item_config(self.base_cfg, source, 1)
-            self.assertEqual(cfg.file_video_asli, os.path.abspath(f.name))
+            self.assertEqual(cfg.source_video_file, os.path.abspath(f.name))
 
     def test_local_file_source_preseeds_download_checkpoint(self):
         """Local files have nothing to download — the per-item checkpoint
@@ -126,7 +126,7 @@ class TestBuildItemConfig(unittest.TestCase):
 
             checkpoint = CheckpointManager(cfg.outputs_dir)
             self.assertTrue(checkpoint.is_step_complete("download"))
-            self.assertEqual(checkpoint.get_step_data("download")["file"], cfg.file_video_asli)
+            self.assertEqual(checkpoint.get_step_data("download")["file"], cfg.source_video_file)
 
     def test_local_file_checkpoint_not_seeded_when_checkpoint_disabled(self):
         from clipping.phase1.checkpoint import CheckpointManager
@@ -168,7 +168,7 @@ class TestRunBatch(unittest.TestCase):
         ]
 
         def fake_run_pipeline(cfg):
-            if cfg.url_youtube.endswith("=b"):
+            if cfg.source_url.endswith("=b"):
                 raise RuntimeError("simulated download failure")
             return [{"rank": 1}]
 

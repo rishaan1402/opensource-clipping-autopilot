@@ -4,7 +4,7 @@ Batch Runner — runs the full clipping pipeline once per input source.
 Wires clipping.phase1.input_handler (multi-source loading/validation) into
 clipping.runner.run_pipeline (single-video pipeline) without modifying that
 function. Each source gets its own isolated outputs_dir and
-file_video_asli path so concurrent/sequential batch items never collide on
+source_video_file path so concurrent/sequential batch items never collide on
 checkpoint state, downloaded video files, or rendered clip filenames.
 """
 
@@ -34,7 +34,7 @@ def slugify_source(source: InputSource, index: int) -> str:
 def build_item_config(base_cfg, source: InputSource, index: int):
     """
     Derive a per-source config from base_cfg, isolating outputs_dir and
-    file_video_asli so this batch item cannot collide with any other.
+    source_video_file so this batch item cannot collide with any other.
 
     Shared/global resources (fonts, BGM assets, base_dir) are intentionally
     left pointing at the same paths as base_cfg — those are safe to share.
@@ -45,23 +45,23 @@ def build_item_config(base_cfg, source: InputSource, index: int):
     os.makedirs(item_dir, exist_ok=True)
 
     cfg.outputs_dir = item_dir
-    cfg.file_video_asli = os.path.join(item_dir, "video_asli.mp4")
-    cfg.url_youtube = source.source
+    cfg.source_video_file = os.path.join(item_dir, "source_video.mp4")
+    cfg.source_url = source.source
 
     if source.source_type in ("youtube", "tiktok", "instagram"):
         cfg.source_platform = source.source_type
     elif source.source_type == "local_file":
-        # local_file sources have nothing to download. Point file_video_asli
+        # local_file sources have nothing to download. Point source_video_file
         # AT the local file directly, and pre-seed THIS item's checkpoint
         # (freshly created per-item, so it has no prior "download" record)
         # so run_pipeline's Step 1 skip-check finds it already complete and
         # never calls engine.download_video (which has no local-file path).
-        cfg.file_video_asli = os.path.abspath(source.source)
+        cfg.source_video_file = os.path.abspath(source.source)
         if getattr(cfg, "enable_checkpoint", True):
             from .checkpoint import CheckpointManager
 
             item_checkpoint = CheckpointManager(cfg.outputs_dir)
-            item_checkpoint.mark_step_complete("download", {"file": cfg.file_video_asli})
+            item_checkpoint.mark_step_complete("download", {"file": cfg.source_video_file})
 
     return cfg
 

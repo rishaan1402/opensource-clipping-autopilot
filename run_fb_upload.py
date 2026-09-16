@@ -57,12 +57,12 @@ def main():
 
     # Check required env vars
     if not os.environ.get("META_PAGE_ACCESS_TOKEN"):
-        print("❌ ERROR: META_PAGE_ACCESS_TOKEN belum di-set.")
+        print("❌ ERROR: META_PAGE_ACCESS_TOKEN not set.")
         print("   Tambahkan ke file .env atau set sebagai environment variable.")
         sys.exit(1)
 
     if not os.environ.get("META_PAGE_ID"):
-        print("❌ ERROR: META_PAGE_ID belum di-set.")
+        print("❌ ERROR: META_PAGE_ID not set.")
         print("   Tambahkan ke file .env atau set sebagai environment variable.")
         sys.exit(1)
 
@@ -75,7 +75,7 @@ def main():
         test_mode=args.test_mode,
     )
 
-    print("\n✅ Proses upload Facebook selesai.")
+    print("\n✅ Facebook upload process complete.")
 
 
 if __name__ == "__main__":

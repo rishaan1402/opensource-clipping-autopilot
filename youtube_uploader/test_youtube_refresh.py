@@ -14,21 +14,21 @@ def main():
 
     print("Token valid:", creds.valid)
     print("Token expired:", creds.expired)
-    print("Ada refresh_token:", bool(creds.refresh_token))
+    print("Has refresh_token:", bool(creds.refresh_token))
     print("Expiry:", creds.expiry)
 
     if not creds.refresh_token:
-        raise RuntimeError("Tidak ada refresh_token. Generate ulang dengan prompt='consent' dan access_type='offline'.")
+        raise RuntimeError("No refresh_token. Regenerate with prompt='consent' and access_type='offline'.")
 
-    print("Mencoba refresh token...")
+    print("Attempting token refresh...")
     creds.refresh(Request())
 
     with open(TOKEN_FILE, "w", encoding="utf-8") as f:
         f.write(creds.to_json())
 
     print("Refresh OK.")
-    print("Token valid setelah refresh:", creds.valid)
-    print("Expiry baru:", creds.expiry)
+    print("Token valid after refresh:", creds.valid)
+    print("New expiry:", creds.expiry)
 
     youtube = build("youtube", "v3", credentials=creds)
 
@@ -39,11 +39,11 @@ def main():
 
     items = resp.get("items", [])
     if not items:
-        print("Token valid, tapi tidak menemukan channel YouTube.")
+        print("Token valid, but no YouTube channel found.")
         return
 
     channel = items[0]
-    print("Channel terdeteksi:", channel["snippet"]["title"])
+    print("Channel detected:", channel["snippet"]["title"])
     print("Channel ID:", channel["id"])
 
 if __name__ == "__main__":

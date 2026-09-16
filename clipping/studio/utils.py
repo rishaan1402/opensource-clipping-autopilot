@@ -44,7 +44,7 @@ def _load_studio_internal_module(file_name: str, module_alias: str):
     module_path = os.path.join(os.path.dirname(__file__), file_name)
     spec = importlib.util.spec_from_file_location(module_alias, module_path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"Gagal memuat modul internal: {module_path}")
+        raise ImportError(f"Failed to load internal module: {module_path}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -113,12 +113,12 @@ RATIO_MAP = {
 VERTICAL_RATIOS = {"9:16", "1:1", "3:4", "4:5"}
 
 
-def _is_vertical_ratio(rasio: str) -> bool:
+def _is_vertical_ratio(ratio: str) -> bool:
     """Return True when the ratio needs a face-tracked crop from the source."""
-    return rasio in VERTICAL_RATIOS
+    return ratio in VERTICAL_RATIOS
 
 
-def _get_render_dims(cfg, rasio, source_h=1080):
+def _get_render_dims(cfg, ratio, source_h=1080):
     """
     Calculate target output resolution based on config and aspect ratio.
     If mode is 'source', it uses the provided source_h as the base dimension.
@@ -127,7 +127,7 @@ def _get_render_dims(cfg, rasio, source_h=1080):
 
     Args:
         cfg: Runtime config object that specifies `render_output_height`.
-        rasio (str): The target aspect ratio.
+        ratio (str): The target aspect ratio.
         source_h (int): The original source video height in pixels.
 
     Returns:
@@ -148,9 +148,9 @@ def _get_render_dims(cfg, rasio, source_h=1080):
         except (ValueError, TypeError):
             target_h_base = 1080
 
-    w_part, h_part = RATIO_MAP.get(rasio, (16, 9))
+    w_part, h_part = RATIO_MAP.get(ratio, (16, 9))
 
-    if _is_vertical_ratio(rasio):
+    if _is_vertical_ratio(ratio):
         # target_h_base is treated as the 'short' side (width)
         out_w = target_h_base
         out_h = int(target_h_base * h_part / w_part)

@@ -14,7 +14,7 @@ from faster_whisper import WhisperModel
 
 
 # ==============================================================================
-# TAHAP 1: DOWNLOAD VIDEO
+# STAGE 1: VIDEO DOWNLOAD
 # ==============================================================================
 
 def _build_ydl_format_selector(download_source_height: str | int) -> str:
@@ -76,8 +76,8 @@ def _download_gdrive(url: str, output_path: str) -> None:
     file_id = _extract_gdrive_file_id(url)
     if not file_id:
         raise RuntimeError(
-            f"Tidak dapat mengekstrak file ID dari URL Google Drive: {url}\n"
-            "      Format yang didukung:\n"
+            f"Could not extract file ID from Google Drive URL: {url}\n"
+            "      Supported formats:\n"
             "        • https://drive.google.com/file/d/FILE_ID/view\n"
             "        • https://drive.google.com/open?id=FILE_ID"
         )
@@ -88,11 +88,11 @@ def _download_gdrive(url: str, output_path: str) -> None:
 
 
 def _ydl_progress_hook(d: dict) -> None:
-    """Render satu baris progress bar download dari data hook yt-dlp.
+    """Renders one download progress bar line from yt-dlp's hook data.
 
-    yt-dlp mengunduh stream video dan audio secara terpisah, jadi hook ini
-    dipanggil untuk masing-masing; newline saat "finished" menjaga tiap bar
-    berada di barisnya sendiri.
+    yt-dlp downloads the video and audio streams separately, so this hook
+    is called for each one; the newline on "finished" keeps each bar on
+    its own line.
     """
     status = d.get("status")
     if status == "downloading":
@@ -107,18 +107,18 @@ def _ydl_progress_hook(d: dict) -> None:
             filled = int(20 * downloaded / total)
             bar = "█" * filled + " " * (20 - filled)
             print(
-                f"\r      Unduh: {pct:3.0f}%|{bar}| "
+                f"\r      Download: {pct:3.0f}%|{bar}| "
                 f"{downloaded / 1048576:.0f}/{total / 1048576:.0f}MB {spd} ETA {eta_s}   ",
                 end="", flush=True,
             )
         else:
-            # Ukuran tidak diketahui (live/streamed manifest) — tampilkan byte + speed saja.
+            # Size unknown (live/streamed manifest) — just show bytes + speed.
             print(
-                f"\r      Unduh: {downloaded / 1048576:.0f}MB {spd}   ",
+                f"\r      Download: {downloaded / 1048576:.0f}MB {spd}   ",
                 end="", flush=True,
             )
     elif status == "finished":
-        print(flush=True)  # tutup baris bar untuk stream ini
+        print(flush=True)  # close this stream's bar line
 
 
 def download_video(
@@ -160,7 +160,7 @@ def download_video(
         "platform": source_platform,
     }
 
-    print(f"[1/3] Mendownload video dari {platform_label}...")
+    print(f"[1/3] Downloading video from {platform_label}...")
     if download_source_height == "max":
         print("      🎯 Source quality: highest available", flush=True)
     else:
@@ -169,7 +169,7 @@ def download_video(
     # yt-dlp's default behavior is to skip downloading if a file already
     # exists at outtmpl — it does NOT check whether that file is actually
     # the URL being requested. Every run reusing the same output_path
-    # (which this pipeline always does — video_asli.mp4) silently kept
+    # (which this pipeline always does — source_video.mp4) silently kept
     # whatever video was downloaded there FIRST, regardless of which URL
     # every subsequent call actually asked for. Removing any stale file
     # up front is the fix; relying on a yt-dlp option here would still
@@ -182,9 +182,9 @@ def download_video(
         _download_gdrive(url, output_path)
         if not os.path.exists(output_path):
             raise RuntimeError(
-                f"❌ Download dari Google Drive gagal — file tidak ditemukan di {output_path}"
+                f"❌ Download from Google Drive failed — file not found at {output_path}"
             )
-        print(f"      ✅ Video berhasil didownload dari Google Drive.", flush=True)
+        print(f"      ✅ Video successfully downloaded from Google Drive.", flush=True)
         return source_info
 
     # --- Build yt-dlp options per platform ---
@@ -223,7 +223,7 @@ def download_video(
 
     # --- Subtitle download — only supported for YouTube ---
     if use_dlp_subs and uses_youtube_format:
-        print("      Mencoba mencari subtitle bahasa otomatis (en / id)...")
+        print("      Trying to find auto-generated subtitles (en / id)...")
         import glob
 
         for lang in ["en", "id"]:
@@ -233,23 +233,23 @@ def download_video(
                 "writeautomaticsub": True,
                 "subtitleslangs": [lang],
                 "subtitlesformat": "json3",
-                "skip_download": True,  # Hanya fokus download subtitle
+                "skip_download": True,  # Only fetch the subtitle, not the video
             })
 
             try:
                 with YoutubeDL(ydl_opts_subs) as ydl:
                     ydl.download([url])
 
-                # Cek apakah json3 untuk bahasa ini benar-benar terdownload
+                # Check whether the json3 for this language actually downloaded
                 if glob.glob(output_path.replace(".mp4", f".*.json3")):
-                    print(f"      ✅ Subtitle '{lang}' ditemukan. Melanjutkan ke video...")
+                    print(f"      ✅ Subtitle '{lang}' found. Continuing to video...")
                     break
             except Exception as e:
-                print(f"      ⚠️ Gagal menarik subtitle '{lang}' ({e}). Mencoba opsi selanjutnya...")
+                print(f"      ⚠️ Failed to fetch subtitle '{lang}' ({e}). Trying next option...")
     elif use_dlp_subs and not uses_youtube_format:
-        print(f"      ℹ️ {platform_label} tidak menyediakan subtitle otomatis. Whisper akan digunakan.")
+        print(f"      ℹ️ {platform_label} doesn't provide auto subtitles. Whisper will be used.")
 
-    # Jalankan download video terpisah dari urusan subtitle
+    # Run the video download separately from subtitle handling
     with YoutubeDL(ydl_opts) as ydl:
         # Extra step to verify resolution before downloading — also the only
         # place we have yt-dlp's parsed info dict, so pull source metadata
@@ -258,7 +258,7 @@ def download_video(
             info = ydl.extract_info(url, download=False)
             best_h = info.get("height", "unknown")
             v_codec = info.get("vcodec", "unknown")
-            print(f"      ✅ Mendownload: {best_h}p (Codec: {v_codec})", flush=True)
+            print(f"      ✅ Downloading: {best_h}p (Codec: {v_codec})", flush=True)
 
             source_info.update({
                 "video_id": info.get("id"),
@@ -270,34 +270,34 @@ def download_video(
                 "license": info.get("license"),
             })
         except Exception as e:
-            print(f"      ⚠️ Gagal mengecek info detail: {e}", flush=True)
+            print(f"      ⚠️ Failed to check detailed info: {e}", flush=True)
 
         ydl.download([url])
 
     # --- Post-download verification ---
     if not os.path.exists(output_path):
         raise RuntimeError(
-            f"❌ Download dari {platform_label} gagal — file video tidak ditemukan di {output_path}.\n"
-            "      Pastikan URL valid dan bisa diakses secara publik."
+            f"❌ Download from {platform_label} failed — video file not found at {output_path}.\n"
+            "      Make sure the URL is valid and publicly accessible."
         )
 
     return source_info
 
 
 # ==============================================================================
-# TAHAP 2: TRANSKRIPSI WHISPER & JSON3 FALLBACK
+# STAGE 2: WHISPER TRANSCRIPTION & JSON3 FALLBACK
 # ==============================================================================
 
 def parse_youtube_json3_subs(json_path: str, max_words_per_subtitle: int = 5) -> tuple[str, list[dict]]:
     """
-    Parse downloaded YouTube JSON3 subtitles into transkrip_lengkap and data_segmen.
+    Parse downloaded YouTube JSON3 subtitles into full_transcript and segment_data.
     Returns empty string/list if parsing fails.
     """
     import json
 
-    print("[2/3] Memproses subtitle JSON3 dari YouTube...")
-    transkrip_lengkap = ""
-    data_segmen = []
+    print("[2/3] Processing JSON3 subtitle from YouTube...")
+    full_transcript = ""
+    segment_data = []
 
     try:
         with open(json_path, "r", encoding="utf-8") as f:
@@ -348,7 +348,7 @@ def parse_youtube_json3_subs(json_path: str, max_words_per_subtitle: int = 5) ->
                 clean_text = re.sub(r"\s{2,}", " ", clean_text).strip()
 
                 if clean_text:
-                    # Memecah teks menjadi kata tunggal agar karaoke per-kata bekerja seperti whisper
+                    # Split text_str into individual words so per-word karaoke works like whisper
                     words_in_seg = clean_text.split()
                     if not words_in_seg:
                         continue
@@ -383,19 +383,19 @@ def parse_youtube_json3_subs(json_path: str, max_words_per_subtitle: int = 5) ->
             if len(chunk_words) == max_words_per_subtitle or i == len(flat_words) - 1:
                 chunk_text = " ".join([cw["word"] for cw in chunk_words])
                 chunk_end = w["end"]
-                transkrip_lengkap += f"[{chunk_start:.1f} - {chunk_end:.1f}] {chunk_text}\n"
+                full_transcript += f"[{chunk_start:.1f} - {chunk_end:.1f}] {chunk_text}\n"
 
-                data_segmen.append({
+                segment_data.append({
                     "start": chunk_start,
                     "end": chunk_end,
                     "words": chunk_words,
                 })
                 chunk_words = []
 
-        return transkrip_lengkap, data_segmen
+        return full_transcript, segment_data
 
     except Exception as e:
-        print(f"⚠️ Gagal memparsing JSON3: {e}")
+        print(f"⚠️ Failed to parse JSON3: {e}")
         return "", []
 
 
@@ -411,45 +411,46 @@ def transcribe_video(
 
     Returns
     -------
-    transkrip_lengkap : str
+    full_transcript : str
         Human-readable transcript with timestamps.
-    data_segmen : list[dict]
+    segment_data : list[dict]
         Word-level segments grouped by *max_words_per_subtitle*.
     """
-    print("[2/3] Memulai transkripsi dengan Faster-Whisper (Level Per-Kata)...")
+    print("[2/3] Starting transcription with Faster-Whisper (Word-Level)...")
 
-    # Langkah-langkah ini berjalan tanpa output di dalam faster-whisper sebelum
-    # segmen pertama dihasilkan, jadi kita umumkan tiap fase — kalau tidak, run
-    # pertama di CPU (download model + decode seluruh audio) terlihat seperti hang.
+    # These steps run without any output inside faster-whisper before the
+    # first segment is produced, so we announce each phase — otherwise the
+    # first CPU run (downloading the model + decoding the whole audio track)
+    # looks like it's hung.
     print(
-        f"      ⏳ Memuat model Whisper '{model_size}' ({device})"
-        " — unduhan pertama kali bisa memakan waktu...",
+        f"      ⏳ Loading Whisper model '{model_size}' ({device})"
+        " — first-time download may take a while...",
         flush=True,
     )
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
 
-    print("      ⏳ Mendekode audio & mengekstrak fitur (belum ada output)...", flush=True)
+    print("      ⏳ Decoding audio & extracting features (no output yet)...", flush=True)
     segments, info = model.transcribe(video_path, beam_size=5, word_timestamps=True)
 
-    transkrip_lengkap = ""
-    data_segmen: list[dict] = []
+    full_transcript = ""
+    segment_data: list[dict] = []
 
-    # Progress bar berdasarkan timestamp audio. faster-whisper men-stream segmen
-    # secara lazy, jadi bar dimajukan ke waktu akhir tiap segmen saat tiba.
+    # Progress bar based on audio timestamps. faster-whisper streams segments
+    # lazily, so the bar advances to each segment's end time as it arrives.
     from tqdm import tqdm
 
     total_dur = round(info.duration, 2)
     progress = tqdm(
         total=total_dur,
         unit="s",
-        desc="      Transkripsi",
+        desc="      Transcription",
         bar_format="{desc}: {percentage:3.0f}%|{bar}| {n:.0f}/{total:.0f}s [{elapsed}<{remaining}]",
     )
 
     for segment in segments:
-        # Clamp agar floating-point drift melewati durasi tidak overshoot.
+        # Clamp so floating-point drift past the duration doesn't overshoot.
         progress.update(min(segment.end, total_dur) - progress.n)
-        transkrip_lengkap += f"[{segment.start:.1f} - {segment.end:.1f}] {segment.text}\n"
+        full_transcript += f"[{segment.start:.1f} - {segment.end:.1f}] {segment.text}\n"
 
         if segment.words:
             chunk_words: list[dict] = []
@@ -466,35 +467,35 @@ def transcribe_video(
                 })
 
                 if len(chunk_words) == max_words_per_subtitle or i == len(segment.words) - 1:
-                    data_segmen.append({
+                    segment_data.append({
                         "start": chunk_start,
                         "end": w.end,
                         "words": chunk_words,
                     })
                     chunk_words = []
 
-    progress.update(total_dur - progress.n)  # snap ke 100% saat selesai
+    progress.update(total_dur - progress.n)  # snap to 100% when done
     progress.close()
-    return transkrip_lengkap, data_segmen
+    return full_transcript, segment_data
 
 
 # ==============================================================================
-# TAHAP 3: ANALISIS GEMINI AI
+# STAGE 3: GEMINI AI ANALYSIS
 # ==============================================================================
 
 TARGET_ACCOUNTS = {
     "Knowledge": {
-        "akun_tujuan": "Knowledge.Clips",
+        "target_account": "Knowledge.Clips",
         "angle_desc": "If the angle is educational/informative: history, science, psychology, philosophy, astronomy, or book summaries — content that makes the viewer learn something interesting, not practical/how-to content.",
         "bio": "Educational clips on science, history & psychology. History | Science | Psychology | Philosophy | Space"
     },
     "GrowthAndMoney": {
-        "akun_tujuan": "Growth.Clips",
+        "target_account": "Growth.Clips",
         "angle_desc": "If the angle is productivity, self-improvement, motivation, personal finance/investing, business, or entrepreneurship — content that pushes the viewer toward action/change in their life or career.",
         "bio": "Insight on growth, productivity & finance. Productivity | Finance | Business | Motivation"
     },
     "SkillsAndLifestyle": {
-        "akun_tujuan": "Skills.Clips",
+        "target_account": "Skills.Clips",
         "angle_desc": "If the angle is a tutorial/practical skill viewers can apply immediately: coding, Excel, DIY, photography, language learning, cooking, or fitness.",
         "bio": "Practical tutorials to upgrade everyday skills. Coding | DIY | Photography | Cooking | Fitness"
     }
@@ -504,7 +505,7 @@ def _build_account_classification_prompt() -> str:
     lines = []
     for tipe, data in TARGET_ACCOUNTS.items():
         lines.append(f"- {tipe}: {data['angle_desc']}")
-        lines.append(f"  (akun_tujuan: \"{data['akun_tujuan']}\", bio: \"{data['bio']}\")")
+        lines.append(f"  (target_account: \"{data['target_account']}\", bio: \"{data['bio']}\")")
     return "\n".join(lines)
 
 
@@ -568,7 +569,7 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
 
             text = getattr(response, "text", None)
             if not text or not text.strip():
-                raise ValueError("Gemini mengembalikan response.text kosong.")
+                raise ValueError("Gemini returned an empty response.text.")
 
             return json.loads(text)
 
@@ -578,7 +579,7 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
             retryable = _is_retryable(exc)
 
             print(
-                f"[Gemini] Attempt {attempt}/{MAX_ATTEMPTS} gagal | "
+                f"[Gemini] Attempt {attempt}/{MAX_ATTEMPTS} failed | "
                 f"status={status_code} | error={exc}"
             )
 
@@ -586,12 +587,12 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
                 break
 
             wait_seconds = INITIAL_WAIT_SECONDS + ((attempt - 1) * WAIT_INCREMENT_SECONDS)
-            print(f"[Gemini] Retry lagi dalam {wait_seconds} detik...")
+            print(f"[Gemini] Retrying in {wait_seconds}s...")
             time.sleep(wait_seconds)
 
-    print(f"[Gemini] Percobaan dengan model utama ({model}) gagal.")
+    print(f"[Gemini] Attempt with primary model ({model}) failed.")
     if fallback_model:
-        print(f"[Gemini] Mencoba satu kali lagi dengan fallback model ({fallback_model})...")
+        print(f"[Gemini] Trying once more with fallback model ({fallback_model})...")
         try:
             response = client.models.generate_content(
                 model=fallback_model,
@@ -600,28 +601,28 @@ def _generate_json_with_retry(client, model, fallback_model, contents, config):
             )
             text = getattr(response, "text", None)
             if not text or not text.strip():
-                raise ValueError("Gemini fallback mengembalikan response.text kosong.")
+                raise ValueError("Gemini fallback returned an empty response.text.")
 
             return json.loads(text)
         except Exception as exc_fallback:
-            print(f"[Gemini] Fallback model gagal | error={exc_fallback}")
+            print(f"[Gemini] Fallback model failed | error={exc_fallback}")
             raise RuntimeError(
-                f"Gagal memanggil Gemini utama & fallback. "
-                f"Laporan Utama status={status_code}, error={last_exc} | "
-                f"Laporan Fallback error={exc_fallback}"
+                f"Failed calling Gemini primary & fallback. "
+                f"Primary report status={status_code}, error={last_exc} | "
+                f"Fallback report error={exc_fallback}"
             ) from exc_fallback
 
     raise RuntimeError(
-        f"Gagal memanggil Gemini setelah {MAX_ATTEMPTS} percobaan. Error terakhir: {last_exc}"
+        f"Failed calling Gemini after {MAX_ATTEMPTS} attempts. Last error: {last_exc}"
     ) from last_exc
 
 
 # ==== KONFIGURASI DURASI KLIP ====
-# Ubah nilai di bawah ini jika ingin mengganti batas durasi klip (dalam detik)
+# Change the values below to adjust clip duration bounds (in seconds)
 MIN_CLIP_DURATION = 20
 MAX_CLIP_DURATION = 179
 
-def get_analysis_prompt(transkrip_lengkap: str, jumlah_clip: int, durasi_hook: int, cfg=None) -> str:
+def get_analysis_prompt(full_transcript: str, clip_count: int, hook_duration: int, cfg=None) -> str:
     """Centralized prompt for both Gemini and NVIDIA providers."""
     # Build optional Hook V2 prompt section
     _hook_v2_prompt = ""
@@ -665,7 +666,7 @@ Read the following video transcript. Transcript format:
 [start_second - end_second] text
 
 MAIN TASK:
-- Find the {jumlah_clip} most interesting, most powerful, most shareable, and most viral-potential moments to turn into short clips.
+- Find the {clip_count} most interesting, most powerful, most shareable, and most viral-potential moments to turn into short clips.
 - Order clips by highest viral_score (most viral potential) to lowest. The "rank" is just a sequence number (1, 2, 3...).
 - For each clip, produce clip timing, hook, typography plan, b-roll plan, selection reasoning, cross-platform metadata, and target-account classification.
 - All output must be highly relevant to the clip's content, not the full video's content in general.
@@ -760,7 +761,7 @@ HOOK (REQUIRED):
   - A bold/surprising statement made early on.
   - A specific number or claim that contrasts with common expectation.
   - A sentence that directly touches the viewer's problem/anxiety ("if you've ever felt...").
-- The hook must feel strong and attention-grabbing within the first ~{durasi_hook} seconds.
+- The hook must feel strong and attention-grabbing within the first ~{hook_duration} seconds.
 - Save as hook_start_time and hook_end_time.
 - The hook must make people want to keep watching, but no fake clickbait — whatever the hook promises must actually be covered in the clip.
 - Make sure the hook is natural and genuinely spoken in the transcript.
@@ -770,13 +771,13 @@ HOOK (REQUIRED):
 TYPOGRAPHY PLAN (KINETIC TYPOGRAPHY):
 - Pick 3-6 SINGLE words that are the most weighty, emotional, or most worth emphasizing from each clip.
 - For each word, determine:
-  1. 'kata_utama': the specific word, spelled exactly as it appears in the transcript.
+  1. 'emphasis_word': the specific word, spelled exactly as it appears in the transcript.
   2. 'scale_level': pick 1, 2, or 3.
      - 1 = normal/small
      - 2 = large/emphasis
      - 3 = huge/very crucial
-  3. 'style': pick "utama" or "khusus".
-  4. 'animasi': pick "bounce_pop" or "stagger_up".
+  3. 'style': pick "primary" or "accent".
+  4. 'animation': pick "bounce_pop" or "stagger_up".
 - Don't pick long phrases. Single words only.
 - Prioritize the word that's strongest emotionally, in meaning, or for visual retention.
 
@@ -807,19 +808,19 @@ SLOW CLOSING:
 - end_time MUST have +0.10 to +0.85 seconds of padding added after the last word so the ending feels relaxed and doesn't cut off abruptly.
 
 SELECTION REASONING:
-- Fill the 'alasan' field with a brief explanation of why this clip deserves to be picked.
+- Fill the 'reason' field with a brief explanation of why this clip deserves to be picked.
 - Focus on emotional value, hook strength, retention potential, shareability, and payoff.
 - Explain the clip's main viral trigger.
 - Explain why people are likely to watch to the end.
 - Explain why the clip stays interesting even watched without the full video's context.
 
 METADATA LANGUAGE RULES:
-- title_indonesia is still required for internal compatibility / fallback.
-- title_indonesia MUST be in natural Indonesian, max 100 characters.
+- title_id is still required for internal compatibility / fallback.
+- title_id MUST be in natural Indonesian, max 100 characters.
 - All main cross-platform metadata must be in natural English.
 - This applies to:
-  - title_inggris
-  - hastag
+  - title_en
+  - hashtags
   - description_hook
   - description_context
   - keyword_tags
@@ -828,7 +829,7 @@ METADATA LANGUAGE RULES:
   - tiktok_title_id
   - tiktok_caption_id
 - tiktok_title_id and tiktok_caption_id MUST be in natural Indonesian.
-- tiktok_title_id must be more descriptive than title_indonesia, may be longer than 100 characters if needed, and must clearly explain the clip/video's content.
+- tiktok_title_id must be more descriptive than title_id, may be longer than 100 characters if needed, and must clearly explain the clip/video's content.
 - tiktok_caption_id must be natural, informative, fit for an Indonesian audience, and may be a bit longer if it helps explain the clip's content.
 - Don't mix Indonesian and English within the same field.
 - Use natural, concise, easy-to-read English suited for short-form content.
@@ -837,12 +838,12 @@ METADATA LANGUAGE RULES:
 CROSS-PLATFORM METADATA:
 For each clip, produce the following metadata:
 
-1. title_indonesia
+1. title_id
 - Natural Indonesian, short, and relevant.
 - This is only for internal compatibility / fallback.
 - Max 100 characters.
 
-2. title_inggris
+2. title_en
 - Natural English, strong, sharp, and easy to read.
 - This is the main title for platform metadata.
 - Max 100 characters.
@@ -853,7 +854,7 @@ For each clip, produce the following metadata:
 - Avoid excessive punctuation like !!! ??? ...
 - Not too generic.
 
-3. hastag
+3. hashtags
 - Fill with 5 to 8 hashtags in one string.
 - All hashtags MUST be in English.
 - Separate with spaces.
@@ -889,7 +890,7 @@ For each clip, produce the following metadata:
 
 7. tiktok_title_id
 - Natural Indonesian.
-- Longer and more descriptive of the video's content than title_indonesia.
+- Longer and more descriptive of the video's content than title_id.
 - No 100-character limit, but still must be concise, clear, and easy to read.
 - Must be relevant to the clip's content, not the full long video's content in general.
 - No cheap clickbait.
@@ -938,7 +939,7 @@ REQUIRED JSON STRUCTURE (follow these field names exactly):
     "hook_start_time": 30.5,
     "hook_end_time": 35.0,
     "bgm_mood": "mood_here",
-    "typography_plan": [{{ "kata_utama": "...", "scale_level": 2, "style": "utama", "animasi": "bounce_pop" }}],
+    "typography_plan": [{{ "emphasis_word": "...", "scale_level": 2, "style": "primary", "animation": "bounce_pop" }}],
     "broll_list": [{{ "start_time": 40.0, "end_time": 45.0, "search_query": "..." }}],
     "recommended_visual_broll_hook": [
       {{ "broll_idea": "...", "search_keyword": "...", "why_it_works": "..." }}
@@ -952,35 +953,35 @@ REQUIRED JSON STRUCTURE (follow these field names exactly):
       {{ "start_time": 30.5, "end_time": 55.0 }},
       {{ "start_time": 58.0, "end_time": 90.0 }}
     ],
-    "title_indonesia": "...",
-    "title_inggris": "...",
-    "hastag": "#hastag1 #hastag2",
+    "title_id": "...",
+    "title_en": "...",
+    "hashtags": "#hastag1 #hastag2",
     "description_hook": "...",
     "description_context": "...",
     "keyword_tags": ["tag1", "tag2"],
     "tiktok_title_id": "...",
     "tiktok_caption_id": "...",
     "tiktok_caption": "...",
-    "alasan": "...",
-    "klasifikasi_akun": {{
-      "tipe_akun": "Knowledge",
-      "akun_tujuan": "Knowledge.Clips",
+    "reason": "...",
+    "account_classification": {{
+      "account_type": "Knowledge",
+      "target_account": "Knowledge.Clips",
       "confidence": 87,
-      "angle_utama": "Informative history/science explanation",
-      "alasan": "...",
-      "kata_kunci_pendukung": ["history", "science"],
-      "bio_akun": "...",
-      "alternatif_akun": {{
-        "tipe_akun": "GrowthAndMoney",
-        "akun_tujuan": "Growth.Clips",
-        "alasan": "..."
+      "main_angle": "Informative history/science explanation",
+      "reason": "...",
+      "supporting_keywords": ["history", "science"],
+      "account_bio": "...",
+      "alternative_account": {{
+        "account_type": "GrowthAndMoney",
+        "target_account": "Growth.Clips",
+        "reason": "..."
       }}
     }}
   }}
 ]
 
 Transcript:
-{transkrip_lengkap}
+{full_transcript}
 """
 
 
@@ -1013,12 +1014,12 @@ def _build_clips_schema() -> dict:
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
-                            "kata_utama": {"type": "string"},
+                            "emphasis_word": {"type": "string"},
                             "scale_level": {"type": "integer", "enum": [1, 2, 3]},
-                            "style": {"type": "string", "enum": ["utama", "khusus"]},
-                            "animasi": {"type": "string", "enum": ["bounce_pop", "stagger_up"]}
+                            "style": {"type": "string", "enum": ["primary", "accent"]},
+                            "animation": {"type": "string", "enum": ["bounce_pop", "stagger_up"]}
                         },
-                        "required": ["kata_utama", "scale_level", "style", "animasi"]
+                        "required": ["emphasis_word", "scale_level", "style", "animation"]
                     }
                 },
                 "broll_list": {
@@ -1047,9 +1048,9 @@ def _build_clips_schema() -> dict:
                         "required": ["broll_idea", "search_keyword", "why_it_works"]
                     }
                 },
-                "title_indonesia": {"type": "string"},
-                "title_inggris": {"type": "string"},
-                "hastag": {"type": "string"},
+                "title_id": {"type": "string"},
+                "title_en": {"type": "string"},
+                "hashtags": {"type": "string"},
                 "description_hook": {"type": "string"},
                 "description_context": {"type": "string"},
                 "keyword_tags": {
@@ -1059,33 +1060,33 @@ def _build_clips_schema() -> dict:
                 "tiktok_title_id": {"type": "string"},
                 "tiktok_caption_id": {"type": "string"},
                 "tiktok_caption": {"type": "string"},
-                "alasan": {"type": "string"},
-                "klasifikasi_akun": {
+                "reason": {"type": "string"},
+                "account_classification": {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "tipe_akun": {"type": "string", "enum": list(TARGET_ACCOUNTS.keys())},
-                        "akun_tujuan": {"type": "string"},
+                        "account_type": {"type": "string", "enum": list(TARGET_ACCOUNTS.keys())},
+                        "target_account": {"type": "string"},
                         "confidence": {"type": "integer"},
-                        "angle_utama": {"type": "string"},
-                        "alasan": {"type": "string"},
-                        "kata_kunci_pendukung": {
+                        "main_angle": {"type": "string"},
+                        "reason": {"type": "string"},
+                        "supporting_keywords": {
                             "type": "array",
                             "items": {"type": "string"}
                         },
-                        "bio_akun": {"type": "string"},
-                        "alternatif_akun": {
+                        "account_bio": {"type": "string"},
+                        "alternative_account": {
                             "type": "object",
                             "additionalProperties": False,
                             "properties": {
-                                "tipe_akun": {"type": "string", "enum": list(TARGET_ACCOUNTS.keys())},
-                                "akun_tujuan": {"type": "string"},
-                                "alasan": {"type": "string"}
+                                "account_type": {"type": "string", "enum": list(TARGET_ACCOUNTS.keys())},
+                                "target_account": {"type": "string"},
+                                "reason": {"type": "string"}
                             },
-                            "required": ["tipe_akun", "akun_tujuan", "alasan"]
+                            "required": ["account_type", "target_account", "reason"]
                         }
                     },
-                    "required": ["tipe_akun", "akun_tujuan", "confidence", "angle_utama", "alasan", "kata_kunci_pendukung", "bio_akun", "alternatif_akun"]
+                    "required": ["account_type", "target_account", "confidence", "main_angle", "reason", "supporting_keywords", "account_bio", "alternative_account"]
                 },
                 "hook_v2": {
                     "type": "object",
@@ -1131,30 +1132,30 @@ def _build_clips_schema() -> dict:
             },
             "required": [
                 "rank", "viral_score", "start_time", "end_time", "hook_start_time", "hook_end_time",
-                "bgm_mood", "typography_plan", "broll_list", "recommended_visual_broll_hook", "title_indonesia",
-                "title_inggris", "hastag", "description_hook", "description_context",
+                "bgm_mood", "typography_plan", "broll_list", "recommended_visual_broll_hook", "title_id",
+                "title_en", "hashtags", "description_hook", "description_context",
                 "keyword_tags", "tiktok_title_id", "tiktok_caption_id", "tiktok_caption",
-                "alasan", "klasifikasi_akun", "hook_v2", "keep_segments"
+                "reason", "account_classification", "hook_v2", "keep_segments"
             ]
         }
     }
 
 
-def analyze_with_nvidia(transkrip_lengkap: str, cfg) -> list[dict]:
+def analyze_with_nvidia(full_transcript: str, cfg) -> list[dict]:
     """Analyze transcript using NVIDIA NIM API (OpenAI compatible)."""
     from openai import OpenAI
     
-    print(f"[3/3] Menganalisis Top {cfg.jumlah_clip} momen menggunakan NVIDIA ({cfg.nvidia_model})...")
-    
+    print(f"[3/3] Analyzing Top {cfg.clip_count} moments using NVIDIA ({cfg.nvidia_model})...")
+
     if not cfg.api_key_nvidia:
-        raise ValueError("NVIDIA_API_KEY tidak ditemukan di environment.")
+        raise ValueError("NVIDIA_API_KEY not found in environment.")
 
     client = OpenAI(
         base_url="https://integrate.api.nvidia.com/v1",
         api_key=cfg.api_key_nvidia
     )
     
-    prompt = get_analysis_prompt(transkrip_lengkap, cfg.jumlah_clip, cfg.durasi_hook, cfg=cfg)
+    prompt = get_analysis_prompt(full_transcript, cfg.clip_count, cfg.hook_duration, cfg=cfg)
 
     last_exc = None
     completion = None
@@ -1177,11 +1178,11 @@ def analyze_with_nvidia(transkrip_lengkap: str, cfg) -> list[dict]:
             break
         except Exception as exc:
             last_exc = exc
-            print(f"[NVIDIA] Attempt {attempt}/{NVIDIA_MAX_ATTEMPTS} gagal | error={exc}")
+            print(f"[NVIDIA] Attempt {attempt}/{NVIDIA_MAX_ATTEMPTS} failed | error={exc}")
             if attempt == NVIDIA_MAX_ATTEMPTS:
                 raise
             wait_seconds = NVIDIA_INITIAL_WAIT_SECONDS + ((attempt - 1) * NVIDIA_WAIT_INCREMENT_SECONDS)
-            print(f"[NVIDIA] Retry lagi dalam {wait_seconds} detik...")
+            print(f"[NVIDIA] Retrying in {wait_seconds}s...")
             time.sleep(wait_seconds)
 
     content = completion.choices[0].message.content
@@ -1190,39 +1191,39 @@ def analyze_with_nvidia(transkrip_lengkap: str, cfg) -> list[dict]:
         content = re.sub(r"```(json)?", "", content).strip()
         content = content.split("```")[0].strip()
         
-    hasil = json.loads(content)
+    result = json.loads(content)
     
     # Guided JSON should return an array directly if schema says type: array
     # but we keep the unwrapper just in case of non-conforming fallbacks
-    if isinstance(hasil, dict):
+    if isinstance(result, dict):
         for key in ["clips", "data", "highlights"]:
-            if key in hasil and isinstance(hasil[key], list):
-                hasil = hasil[key]
+            if key in result and isinstance(result[key], list):
+                result = result[key]
                 break
                 
-    if not isinstance(hasil, list):
-        if isinstance(hasil, dict):
-            return [hasil]
-        raise ValueError(f"Provider NVIDIA mengembalikan format non-list/dict: {type(hasil)}")
+    if not isinstance(result, list):
+        if isinstance(result, dict):
+            return [result]
+        raise ValueError(f"NVIDIA provider returned a non-list/dict format: {type(result)}")
 
-    return hasil
+    return result
 
 
-def analyze_with_groq(transkrip_lengkap: str, cfg) -> list[dict]:
+def analyze_with_groq(full_transcript: str, cfg) -> list[dict]:
     """Analyze transcript using Groq's API (OpenAI compatible, LPU-hosted for speed)."""
     from openai import OpenAI
 
-    print(f"[3/3] Menganalisis Top {cfg.jumlah_clip} momen menggunakan Groq ({cfg.groq_model})...")
+    print(f"[3/3] Analyzing Top {cfg.clip_count} moments using Groq ({cfg.groq_model})...")
 
     if not cfg.api_key_groq:
-        raise ValueError("GROQ_API_KEY tidak ditemukan di environment.")
+        raise ValueError("GROQ_API_KEY not found in environment.")
 
     client = OpenAI(
         base_url="https://api.groq.com/openai/v1",
         api_key=cfg.api_key_groq,
     )
 
-    prompt = get_analysis_prompt(transkrip_lengkap, cfg.jumlah_clip, cfg.durasi_hook, cfg=cfg)
+    prompt = get_analysis_prompt(full_transcript, cfg.clip_count, cfg.hook_duration, cfg=cfg)
 
     # Strict schema-constrained decoding — only some Groq models support it (per
     # console.groq.com/docs/structured-outputs). This is the actual lever for making a
@@ -1273,11 +1274,11 @@ def analyze_with_groq(transkrip_lengkap: str, cfg) -> list[dict]:
             break
         except Exception as exc:
             last_exc = exc
-            print(f"[Groq] Attempt {attempt}/{NVIDIA_MAX_ATTEMPTS} gagal | error={exc}")
+            print(f"[Groq] Attempt {attempt}/{NVIDIA_MAX_ATTEMPTS} failed | error={exc}")
             if attempt == NVIDIA_MAX_ATTEMPTS:
                 raise
             wait_seconds = NVIDIA_INITIAL_WAIT_SECONDS + ((attempt - 1) * NVIDIA_WAIT_INCREMENT_SECONDS)
-            print(f"[Groq] Retry lagi dalam {wait_seconds} detik...")
+            print(f"[Groq] Retrying in {wait_seconds}s...")
             time.sleep(wait_seconds)
 
     content = completion.choices[0].message.content
@@ -1286,31 +1287,31 @@ def analyze_with_groq(transkrip_lengkap: str, cfg) -> list[dict]:
         content = re.sub(r"```(json)?", "", content).strip()
         content = content.split("```")[0].strip()
 
-    hasil = json.loads(content)
+    result = json.loads(content)
 
-    if isinstance(hasil, dict):
+    if isinstance(result, dict):
         for key in ["clips", "data", "highlights"]:
-            if key in hasil and isinstance(hasil[key], list):
-                hasil = hasil[key]
+            if key in result and isinstance(result[key], list):
+                result = result[key]
                 break
 
-    if not isinstance(hasil, list):
-        if isinstance(hasil, dict):
-            return [hasil]
-        raise ValueError(f"Provider Groq mengembalikan format non-list/dict: {type(hasil)}")
+    if not isinstance(result, list):
+        if isinstance(result, dict):
+            return [result]
+        raise ValueError(f"Groq provider returned a non-list/dict format: {type(result)}")
 
-    return hasil
+    return result
 
 
 _TRANSCRIPT_TIMESTAMP_RE = re.compile(r"\[\s*[\d.]+\s*-\s*([\d.]+)\s*\]")
 
 
-def _estimate_transcript_duration_seconds(transkrip_lengkap: str) -> float:
+def _estimate_transcript_duration_seconds(full_transcript: str) -> float:
     """Reads the source video's duration back out of the transcript's own
     "[start - end] text" line format (see get_analysis_prompt's format description) —
     the last end-timestamp found is the video length. Returns 0.0 if unparseable, which
     callers should treat as "unknown, don't gate on it" rather than "zero-length video"."""
-    matches = _TRANSCRIPT_TIMESTAMP_RE.findall(transkrip_lengkap)
+    matches = _TRANSCRIPT_TIMESTAMP_RE.findall(full_transcript)
     if not matches:
         return 0.0
     try:
@@ -1319,62 +1320,62 @@ def _estimate_transcript_duration_seconds(transkrip_lengkap: str) -> float:
         return 0.0
 
 
-def analyze_with_ai(transkrip_lengkap: str, cfg) -> list[dict]:
+def analyze_with_ai(full_transcript: str, cfg) -> list[dict]:
     """Dispatcher for AI analysis based on provider."""
     provider = getattr(cfg, "ai_provider", "gemini")
 
     if provider == "nvidia":
         if not cfg.api_key_nvidia:
-            print("⚠️ NVIDIA_API_KEY tidak ditemukan! Mencoba fallback ke Gemini...")
+            print("⚠️ NVIDIA_API_KEY not found! Trying fallback to Gemini...")
         else:
             try:
-                return analyze_with_nvidia(transkrip_lengkap, cfg)
+                return analyze_with_nvidia(full_transcript, cfg)
             except Exception as e:
-                print(f"⚠️ NVIDIA API gagal: {e}. Fallback ke Gemini...")
+                print(f"⚠️ NVIDIA API failed: {e}. Falling back to Gemini...")
 
     if provider == "groq":
         from .config import GROQ_MAX_VIDEO_DURATION_SECONDS  # local import: only needed here,
         # and avoids relying on cfg.groq_max_duration_seconds always being set (it is, via
         # build_config(), but this getattr fallback is the defensive case where it isn't).
         max_duration = getattr(cfg, "groq_max_duration_seconds", GROQ_MAX_VIDEO_DURATION_SECONDS)
-        video_duration = _estimate_transcript_duration_seconds(transkrip_lengkap) if max_duration else 0.0
+        video_duration = _estimate_transcript_duration_seconds(full_transcript) if max_duration else 0.0
         oversized = bool(max_duration) and video_duration > max_duration
 
         if not cfg.api_key_groq:
-            print("⚠️ GROQ_API_KEY tidak ditemukan! Mencoba fallback ke Gemini...")
+            print("⚠️ GROQ_API_KEY not found! Trying fallback to Gemini...")
         elif oversized and not getattr(cfg, "groq_oversized_fallback_gemini", False):
             raise RuntimeError(
-                f"Video ini {video_duration/60:.1f}min, melebihi --groq-max-duration-seconds "
-                f"({max_duration/60:.1f}min) — transkrip penuh akan melebihi TPM budget Groq's "
-                f"free tier. Dilewati (bukan fallback ke Gemini — pass "
-                f"--groq-oversized-fallback-gemini untuk mengubah perilaku ini)."
+                f"This video is {video_duration/60:.1f}min, over --groq-max-duration-seconds "
+                f"({max_duration/60:.1f}min) — the full transcript would exceed Groq's free-tier "
+                f"TPM budget. Skipping (not falling back to Gemini — pass "
+                f"--groq-oversized-fallback-gemini to change this behavior)."
             )
         elif oversized:
             print(
-                f"⚠️ Video ini {video_duration/60:.1f}min, melebihi --groq-max-duration-seconds "
-                f"({max_duration/60:.1f}min) — transkrip penuh akan melebihi TPM budget Groq's "
-                f"free tier. Melewati Groq, langsung ke Gemini..."
+                f"⚠️ This video is {video_duration/60:.1f}min, over --groq-max-duration-seconds "
+                f"({max_duration/60:.1f}min) — the full transcript would exceed Groq's free-tier "
+                f"TPM budget. Skipping Groq, going straight to Gemini..."
             )
         else:
             try:
-                return analyze_with_groq(transkrip_lengkap, cfg)
+                return analyze_with_groq(full_transcript, cfg)
             except Exception as e:
-                print(f"⚠️ Groq API gagal: {e}. Fallback ke Gemini...")
+                print(f"⚠️ Groq API failed: {e}. Falling back to Gemini...")
 
-    return analyze_with_gemini(transkrip_lengkap, cfg)
+    return analyze_with_gemini(full_transcript, cfg)
 
 
 def analyze_with_gemini(
-    transkrip_lengkap: str,
+    full_transcript: str,
     cfg,
 ) -> list[dict]:
     """Analyse transcript with Gemini AI."""
     import google.genai as genai
     from google.genai import types
 
-    print(f"[3/3] Menganalisis Top {cfg.jumlah_clip} momen terbaik menggunakan Gemini...")
+    print(f"[3/3] Analyzing Top {cfg.clip_count} best moments using Gemini...")
 
-    prompt = get_analysis_prompt(transkrip_lengkap, cfg.jumlah_clip, cfg.durasi_hook, cfg=cfg)
+    prompt = get_analysis_prompt(full_transcript, cfg.clip_count, cfg.hook_duration, cfg=cfg)
 
     # JSON Schema definitions (same as before)
     schema_broll = {
@@ -1408,39 +1409,39 @@ def analyze_with_gemini(
         "items": {
             "type": "OBJECT",
             "properties": {
-                "kata_utama": {"type": "STRING"},
+                "emphasis_word": {"type": "STRING"},
                 "scale_level": {"type": "INTEGER"},
                 "style": {"type": "STRING"},
-                "animasi": {"type": "STRING"},
+                "animation": {"type": "STRING"},
             },
-            "required": ["kata_utama", "scale_level", "style", "animasi"],
+            "required": ["emphasis_word", "scale_level", "style", "animation"],
         },
     }
 
-    schema_klasifikasi = {
+    schema_account_classification = {
         "type": "OBJECT",
         "properties": {
-            "tipe_akun": {"type": "STRING"},
-            "akun_tujuan": {"type": "STRING"},
+            "account_type": {"type": "STRING"},
+            "target_account": {"type": "STRING"},
             "confidence": {"type": "INTEGER"},
-            "angle_utama": {"type": "STRING"},
-            "alasan": {"type": "STRING"},
-            "kata_kunci_pendukung": {
+            "main_angle": {"type": "STRING"},
+            "reason": {"type": "STRING"},
+            "supporting_keywords": {
                 "type": "ARRAY",
                 "items": {"type": "STRING"},
             },
-            "bio_akun": {"type": "STRING"},
-            "alternatif_akun": {
+            "account_bio": {"type": "STRING"},
+            "alternative_account": {
                 "type": "OBJECT",
                 "properties": {
-                    "tipe_akun": {"type": "STRING"},
-                    "akun_tujuan": {"type": "STRING"},
-                    "alasan": {"type": "STRING"},
+                    "account_type": {"type": "STRING"},
+                    "target_account": {"type": "STRING"},
+                    "reason": {"type": "STRING"},
                 },
-                "required": ["tipe_akun", "akun_tujuan", "alasan"],
+                "required": ["account_type", "target_account", "reason"],
             },
         },
-        "required": ["tipe_akun", "akun_tujuan", "confidence", "angle_utama", "alasan", "kata_kunci_pendukung", "bio_akun", "alternatif_akun"],
+        "required": ["account_type", "target_account", "confidence", "main_angle", "reason", "supporting_keywords", "account_bio", "alternative_account"],
     }
 
     client = genai.Client(
@@ -1467,11 +1468,11 @@ def analyze_with_gemini(
                     "typography_plan": schema_typography,
                     "broll_list": schema_broll,
                     "recommended_visual_broll_hook": schema_visual_broll_hook,
-                    "alasan": {"type": "STRING"},
+                    "reason": {"type": "STRING"},
                     "bgm_mood": {"type": "STRING"},
-                    "title_indonesia": {"type": "STRING"},
-                    "title_inggris": {"type": "STRING"},
-                    "hastag": {"type": "STRING"},
+                    "title_id": {"type": "STRING"},
+                    "title_en": {"type": "STRING"},
+                    "hashtags": {"type": "STRING"},
                     "description_hook": {"type": "STRING"},
                     "description_context": {"type": "STRING"},
                     "keyword_tags": {
@@ -1481,7 +1482,7 @@ def analyze_with_gemini(
                     "tiktok_title_id": {"type": "STRING"},
                     "tiktok_caption_id": {"type": "STRING"},
                     "tiktok_caption": {"type": "STRING"},
-                    "klasifikasi_akun": schema_klasifikasi,
+                    "account_classification": schema_account_classification,
                     "hook_v2": {
                         "type": "OBJECT",
                         "properties": {
@@ -1523,12 +1524,12 @@ def analyze_with_gemini(
                 "required": [
                     "rank", "viral_score", "hook_start_time", "hook_end_time",
                     "start_time", "end_time", "typography_plan",
-                    "broll_list", "recommended_visual_broll_hook", "alasan", "bgm_mood",
-                    "title_indonesia", "title_inggris", "hastag",
+                    "broll_list", "recommended_visual_broll_hook", "reason", "bgm_mood",
+                    "title_id", "title_en", "hashtags",
                     "description_hook", "description_context",
                     "keyword_tags", "tiktok_title_id",
                     "tiktok_caption_id", "tiktok_caption",
-                    "klasifikasi_akun", "hook_v2", "keep_segments",
+                    "account_classification", "hook_v2", "keep_segments",
                 ],
             },
         },

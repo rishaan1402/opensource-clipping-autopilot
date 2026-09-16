@@ -27,7 +27,7 @@ from typing import Dict, List
 from .monetization import MonetizationScorer
 
 
-def extract_candidate_text(klip: Dict, data_segmen: List[Dict]) -> str:
+def extract_candidate_text(clip: Dict, segment_data: List[Dict]) -> str:
     """
     Build transcript text for a candidate's [start_time, end_time] window.
 
@@ -39,17 +39,17 @@ def extract_candidate_text(klip: Dict, data_segmen: List[Dict]) -> str:
     (`words: [{word: ...}, ...]`, no top-level `text`).
 
     Args:
-        klip: Candidate dict with 'start_time' / 'end_time' keys.
-        data_segmen: Transcript segments from Whisper or YouTube JSON3.
+        clip: Candidate dict with 'start_time' / 'end_time' keys.
+        segment_data: Transcript segments from Whisper or YouTube JSON3.
 
     Returns:
         Joined transcript text for the window (empty string if no overlap).
     """
-    start = float(klip.get("start_time", 0.0))
-    end = float(klip.get("end_time", 0.0))
+    start = float(clip.get("start_time", 0.0))
+    end = float(clip.get("end_time", 0.0))
 
     lines = []
-    for seg in data_segmen:
+    for seg in segment_data:
         seg_end = float(seg.get("end", 0.0))
         seg_start = float(seg.get("start", 0.0))
         if seg_end > start and seg_start < end:
@@ -62,29 +62,29 @@ def extract_candidate_text(klip: Dict, data_segmen: List[Dict]) -> str:
     return " ".join(lines).strip()
 
 
-def build_monetization_input(klip: Dict, data_segmen: List[Dict]) -> Dict:
+def build_monetization_input(clip: Dict, segment_data: List[Dict]) -> Dict:
     """
     Build the {'text', 'start', 'end'} dict MonetizationScorer expects.
 
     Args:
-        klip: Candidate dict with 'start_time' / 'end_time' keys.
-        data_segmen: Transcript segments.
+        clip: Candidate dict with 'start_time' / 'end_time' keys.
+        segment_data: Transcript segments.
 
     Returns:
         {'text': str, 'start': float, 'end': float}
     """
     return {
-        "text": extract_candidate_text(klip, data_segmen),
-        "start": float(klip.get("start_time", 0.0)),
-        "end": float(klip.get("end_time", 0.0)),
-        "has_face": klip.get("has_face"),
-        "has_motion": klip.get("has_motion"),
+        "text": extract_candidate_text(clip, segment_data),
+        "start": float(clip.get("start_time", 0.0)),
+        "end": float(clip.get("end_time", 0.0)),
+        "has_face": clip.get("has_face"),
+        "has_motion": clip.get("has_motion"),
     }
 
 
 def score_candidates(
-    hasil_json: List[Dict],
-    data_segmen: List[Dict],
+    result_json: List[Dict],
+    segment_data: List[Dict],
     quality_weight: float = 0.7,
     monetization_weight: float = 0.3,
 ) -> List[Dict]:
@@ -107,10 +107,10 @@ def score_candidates(
                                  'monetization': monetization_weight}
 
     Args:
-        hasil_json: Candidate list as produced by
+        result_json: Candidate list as produced by
             clipping.metadata.normalize_and_validate (each item must already
             have a numeric 'viral_score').
-        data_segmen: Transcript segments used to extract per-candidate text.
+        segment_data: Transcript segments used to extract per-candidate text.
         quality_weight: Weight (0-1) for the existing AI viral_score.
         monetization_weight: Weight (0-1) for the monetization score.
 
@@ -131,16 +131,16 @@ def score_candidates(
             f"got {quality_weight} + {monetization_weight} = {total_weight}"
         )
 
-    for klip in hasil_json:
-        mon_input = build_monetization_input(klip, data_segmen)
+    for clip in result_json:
+        mon_input = build_monetization_input(clip, segment_data)
         metrics = MonetizationScorer.score_clip(mon_input)
 
-        viral_score = float(klip.get("viral_score", 0))
+        viral_score = float(clip.get("viral_score", 0))
         quality_norm = viral_score / 100.0
 
-        klip["quality_score_raw"] = viral_score
-        klip["quality_score_norm"] = quality_norm
-        klip["monetization"] = {
+        clip["quality_score_raw"] = viral_score
+        clip["quality_score_norm"] = quality_norm
+        clip["monetization"] = {
             "hook_strength": metrics.hook_strength,
             "vvsa_score": metrics.vvsa_score,
             "retention_score": metrics.retention_score,
@@ -152,29 +152,29 @@ def score_candidates(
             "has_motion": metrics.has_motion,
             "recommendations": metrics.recommendations,
         }
-        klip["combined_score"] = (
+        clip["combined_score"] = (
             quality_weight * quality_norm
             + monetization_weight * metrics.monetization_score
         )
-        klip["scoring_weights"] = {
+        clip["scoring_weights"] = {
             "quality": quality_weight,
             "monetization": monetization_weight,
         }
 
-    return hasil_json
+    return result_json
 
 
-def write_candidates_artifact(hasil_json: List[Dict], path: str) -> None:
+def write_candidates_artifact(result_json: List[Dict], path: str) -> None:
     """
     Write the (scored or unscored) candidate list to an inspectable JSON
     artifact, following the same convention as gemini_response.json and
     metadata_preview.json in clipping/runner.py.
 
     Args:
-        hasil_json: Candidate list, scored or not.
+        result_json: Candidate list, scored or not.
         path: Destination file path (typically
             os.path.join(cfg.outputs_dir, "clip_candidates.json")).
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(hasil_json, f, ensure_ascii=False, indent=2)
+        json.dump(result_json, f, ensure_ascii=False, indent=2)

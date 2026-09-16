@@ -46,7 +46,7 @@ def load_safety_config(config_path: str = "upload_safety.json") -> dict:
                 user_cfg = json.load(f)
                 default_config.update(user_cfg)
         except Exception as e:
-            print(f"⚠️ Gagal membaca {config_path}: {e}")
+            print(f"⚠️ Failed to read {config_path}: {e}")
 
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(default_config, f, indent=4)
@@ -101,14 +101,14 @@ def enforce_min_interval(requested_hours: int, safety_config: dict) -> int:
     min_hours = safety_config["interval_hours_min"]
     effective = max(requested_hours, min_hours)
     if effective != requested_hours:
-        print(f"🛡️ Interval diubah dari {requested_hours}h → {effective}h")
+        print(f"🛡️ Interval changed from {requested_hours}h → {effective}h")
     return effective
 
 
 def limit_pending_items(items: list, safety_config: dict) -> list:
     max_per_run = safety_config["max_upload_per_run"]
     if len(items) > max_per_run:
-        print(f"🛡️ Membatasi upload: {len(items)} item → {max_per_run} item per run")
+        print(f"🛡️ Limiting uploads: {len(items)} items → {max_per_run} items per run")
         return items[:max_per_run]
     return items
 
@@ -158,42 +158,42 @@ def check_queue_limit(youtube, safety_config: dict, tz_name: str = "Asia/Makassa
 
         return scheduled_count < max_queue, scheduled_count, max_queue
     except Exception as e:
-        print(f"⚠️ Gagal mengecek scheduled queue: {e}")
+        print(f"⚠️ Failed to check scheduled queue: {e}")
         return True, 0, max_queue
 
 
 def prompt_manual_approval(item: dict, publish_at_local=None) -> bool:
-    title = item.get("youtube_title_final") or item.get("title_inggris") or f"Clip Rank {item.get('rank', '?')}"
+    title = item.get("youtube_title_final") or item.get("title_en") or f"Clip Rank {item.get('rank', '?')}"
     video_path = item.get("video_path", "?")
 
     print("\n" + "=" * 60)
     print("🛡️ MANUAL APPROVAL REQUIRED")
     print("=" * 60)
-    print(f"  Judul    : {title}")
+    print(f"  Title    : {title}")
     print(f"  File     : {os.path.basename(video_path)}")
     if publish_at_local:
-        print(f"  Jadwal   : {publish_at_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        print(f"  Schedule : {publish_at_local.strftime('%Y-%m-%d %H:%M:%S %Z')}")
     print("=" * 60)
     print()
-    print("⚠️  CHECKLIST SEBELUM APPROVE:")
-    print("  □ Sudah review video secara manual?")
-    print("  □ Ada narasi/analisis/voice-over kamu sendiri?")
-    print("  □ Judul & thumbnail BUKAN meniru creator asli?")
+    print("⚠️  CHECKLIST BEFORE APPROVING:")
+    print("  □ Have you reviewed the video manually?")
+    print("  □ Does it have your own narration/analysis/voice-over?")
+    print("  □ Is the title & thumbnail NOT copying the original creator?")
     print()
 
     while True:
         try:
-            answer = input("Upload video ini? (y/n): ").strip().lower()
+            answer = input("Upload this video? (y/n): ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            print("\n⏹️ Upload dibatalkan oleh user.")
+            print("\n⏹️ Upload cancelled by user.")
             return False
 
         if answer in ("y", "yes"):
             return True
         if answer in ("n", "no"):
-            print("⏭️ Video dilewati.")
+            print("⏭️ Video skipped.")
             return False
-        print("   Ketik 'y' untuk upload atau 'n' untuk skip.")
+        print("   Type 'y' to upload or 'n' to skip.")
 
 
 def print_safety_summary(safety_config: dict, tz_name: str = "Asia/Makassar") -> None:
@@ -209,4 +209,4 @@ def print_safety_summary(safety_config: dict, tz_name: str = "Asia/Makassar") ->
     print(f"  Upload log         : {safety_config['upload_log_file']}")
     print("=" * 60)
     if not is_allowed:
-        print(f"\n🚫 DAILY LIMIT REACHED! Sudah {uploads_today}/{max_per_day} upload hari ini.")
+        print(f"\n🚫 DAILY LIMIT REACHED! Already {uploads_today}/{max_per_day} uploads today.")

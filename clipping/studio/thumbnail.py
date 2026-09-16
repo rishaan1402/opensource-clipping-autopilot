@@ -43,7 +43,7 @@ build_ffmpeg_progress_cmd = _ffmpeg_utils.build_ffmpeg_progress_cmd
 run_ffmpeg_with_progress = _ffmpeg_utils.run_ffmpeg_with_progress
 
 
-def buat_thumbnail(video_path, output_image_path, teks, cfg):
+def create_thumbnail(video_path, output_image_path, text_str, cfg):
     """
     Extract a frame from the video, composite the clip title on top, and save as a thumbnail image.
 
@@ -52,8 +52,8 @@ def buat_thumbnail(video_path, output_image_path, teks, cfg):
         output_image (str): Destination path for the generated JPEG thumbnail.
         start_clip (float): Clip start time in seconds (to locate a frame).
         end_clip (float): Clip end time in seconds.
-        judul (str): The title text to be written on the thumbnail.
-        rasio (str): Target output ratio string ('9:16' or '16:9').
+        title_id_text (str): The title text to be written on the thumbnail.
+        ratio (str): Target output ratio string ('9:16' or '16:9').
         cfg: Runtime configuration object.
 
     Returns:
@@ -85,7 +85,7 @@ def buat_thumbnail(video_path, output_image_path, teks, cfg):
     draw = ImageDraw.Draw(img)
     font_sz = int(img.size[0] * 0.12)
     font = ImageFont.truetype(cfg.file_font_thumbnail, font_sz)
-    lines = textwrap.wrap(teks, width=12)
+    lines = textwrap.wrap(text_str, width=12)
 
     y_text = (img.size[1] - (len(lines) * (font_sz + 10))) // 2
     for line in lines:

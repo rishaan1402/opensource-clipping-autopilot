@@ -47,7 +47,7 @@ _get_render_dims = utils._get_render_dims
 _is_vertical_ratio = utils._is_vertical_ratio
 RATIO_MAP = utils.RATIO_MAP
 
-def siapkan_glitch_video(rasio, cfg, video_encoder, source_h=1080, custom_dims=None):
+def prepare_glitch_video(ratio, cfg, video_encoder, source_h=1080, custom_dims=None):
     """
     Generate a 1-second VHS glitch transition video.
 
@@ -55,7 +55,7 @@ def siapkan_glitch_video(rasio, cfg, video_encoder, source_h=1080, custom_dims=N
     Fallback: generate RGB-shift noise via FFmpeg lavfi filters if download fails.
 
     Args:
-        rasio (str): Target output ratio string ('9:16', '16:9', etc.).
+        ratio (str): Target output ratio string ('9:16', '16:9', etc.).
         cfg: Runtime config (used for render_output_height, video_scale_algo,
              and url_glitch_video).
         video_encoder: Encoder descriptor dict from detect_video_encoder().
@@ -68,7 +68,7 @@ def siapkan_glitch_video(rasio, cfg, video_encoder, source_h=1080, custom_dims=N
     if custom_dims:
         out_w, out_h = custom_dims
     else:
-        out_w, out_h = _get_render_dims(cfg, rasio, source_h=source_h)
+        out_w, out_h = _get_render_dims(cfg, ratio, source_h=source_h)
 
     # Use dimensions in filename to allow multiple cached versions
     glitch_ts = f"glitch_ready_{out_w}x{out_h}.ts"
@@ -93,9 +93,9 @@ def siapkan_glitch_video(rasio, cfg, video_encoder, source_h=1080, custom_dims=N
                 ).download([url_glitch])
                 use_downloaded = True
             else:
-                print("⚠️ url_glitch_video tidak diset, generate glitch sendiri...", flush=True)
+                print("⚠️ url_glitch_video not set, generating glitch locally...", flush=True)
         except Exception as e:
-            print(f"⚠️ Download glitch gagal: {e}. Fallback ke generate sendiri...", flush=True)
+            print(f"⚠️ Glitch download failed: {e}. Falling back to local generation...", flush=True)
             # Clean up partial download
             if os.path.exists(glitch_raw):
                 os.remove(glitch_raw)
@@ -108,8 +108,8 @@ def siapkan_glitch_video(rasio, cfg, video_encoder, source_h=1080, custom_dims=N
         if custom_dims:
             filter_g = f"scale={out_w}:{out_h}:flags={algo},setsar=1"
         else:
-            if _is_vertical_ratio(rasio):
-                w_part, h_part = RATIO_MAP.get(rasio, (9, 16))
+            if _is_vertical_ratio(ratio):
+                w_part, h_part = RATIO_MAP.get(ratio, (9, 16))
                 filter_g = (
                     f"crop=ih*{w_part}/{h_part}:ih:(iw-ih*{w_part}/{h_part})/2:0,"
                     f"scale={out_w}:{out_h}:flags={algo},setsar=1"

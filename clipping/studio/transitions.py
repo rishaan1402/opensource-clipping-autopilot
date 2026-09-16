@@ -163,14 +163,14 @@ def download_transition_raw(entry: dict, cfg) -> str | None:
             }
         ).download([entry["url"]])
     except Exception as e:
-        print(f"   ⚠️ [Transition] Download gagal ({entry['label']}): {e}")
+        print(f"   ⚠️ [Transition] Download failed ({entry['label']}): {e}")
         return None
 
     if os.path.exists(raw_path) and os.path.getsize(raw_path) > 10_000:
-        print(f"   ✅ [Transition] Tersimpan: {raw_path}")
+        print(f"   ✅ [Transition] Saved: {raw_path}")
         return raw_path
 
-    print(f"   ⚠️ [Transition] File terlalu kecil / gagal: {raw_path}")
+    print(f"   ⚠️ [Transition] File too small / failed: {raw_path}")
     return None
 
 
@@ -201,7 +201,7 @@ def download_all_transitions(cfg, types: list[str] | None = None) -> list[dict]:
             results.append(enriched)
 
     print(
-        f"   📦 [Transition] {len(results)}/{len(pool)} asset berhasil diunduh."
+        f"   📦 [Transition] {len(results)}/{len(pool)} assets downloaded successfully."
     )
     return results
 
@@ -248,7 +248,7 @@ def get_random_transition(
 
 def prepare_transition_clip(
     entry: dict,
-    rasio: str,
+    ratio: str,
     cfg,
     video_encoder: dict,
     source_h: int = 1080,
@@ -265,7 +265,7 @@ def prepare_transition_clip(
 
     Args:
         entry:          Pool entry dict (must have ``"raw_path"``).
-        rasio:          Target aspect ratio string.
+        ratio:          Target aspect ratio string.
         cfg:            Runtime config.
         video_encoder:  Encoder descriptor dict.
         source_h:       Source video height for dimension calculation.
@@ -283,7 +283,7 @@ def prepare_transition_clip(
     if custom_dims:
         out_w, out_h = custom_dims
     else:
-        out_w, out_h = _get_render_dims(cfg, rasio, source_h=source_h)
+        out_w, out_h = _get_render_dims(cfg, ratio, source_h=source_h)
 
     skip = entry.get("skip", 5)
     dur = clip_duration or entry.get("duration") or 3.0
@@ -298,8 +298,8 @@ def prepare_transition_clip(
 
     if custom_dims:
         vf = f"scale={out_w}:{out_h}:flags={algo},setsar=1"
-    elif _is_vertical_ratio(rasio):
-        w_part, h_part = RATIO_MAP.get(rasio, (9, 16))
+    elif _is_vertical_ratio(ratio):
+        w_part, h_part = RATIO_MAP.get(ratio, (9, 16))
         vf = (
             f"crop=ih*{w_part}/{h_part}:ih:(iw-ih*{w_part}/{h_part})/2:0,"
             f"scale={out_w}:{out_h}:flags={algo},setsar=1"
@@ -327,5 +327,5 @@ def prepare_transition_clip(
         )
         return ts_path
     except subprocess.CalledProcessError as e:
-        print(f"   ⚠️ [Transition] FFmpeg gagal untuk {entry['label']}: {e}")
+        print(f"   ⚠️ [Transition] FFmpeg failed for {entry['label']}: {e}")
         return None
