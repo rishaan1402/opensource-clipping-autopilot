@@ -24,3 +24,8 @@ sentence-transformers
 librosa
 soundfile
 transformers
+# Pinned to the range Kaggle's preinstalled RAPIDS stack (cuml-cu12/cudf-cu12) already
+# wants -- without this, pip's resolver backtracks through dozens of numba/llvmlite
+# combinations trying to satisfy librosa's own (much looser) floor, eventually landing
+# on numba==0.58.1, which has no Python 3.12 wheel and fails a source build.
+numba>=0.60,<0.62
