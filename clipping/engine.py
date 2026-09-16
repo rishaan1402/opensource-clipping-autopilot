@@ -178,14 +178,24 @@ def download_video(
     if os.path.exists(output_path):
         os.remove(output_path)
 
-    # Also clean up any stray .part files from a previous interrupted download at
-    # this same output_path — yt-dlp's default resume behavior (continuedl=True)
-    # would otherwise try to resume from a partial file whose byte range no longer
-    # matches the server (e.g. a re-signed YouTube URL), failing with a
-    # "416 Requested range not satisfiable" error. continuedl=False below is the
-    # primary fix; this glob is belt-and-suspenders since output_path is always
-    # freshly downloaded here, never actually resumed on purpose.
-    for stray in glob.glob(f"{output_path}*.part"):
+    # Also clean up any stray .part/.ytdl files from a previous interrupted
+    # download at this same output_path.
+    #
+    # .part is yt-dlp's plain HTTP-range partial file — continuedl=False below
+    # is the primary fix for that, this glob is belt-and-suspenders since
+    # output_path is always freshly downloaded here, never actually resumed
+    # on purpose.
+    #
+    # .ytdl is a SEPARATE mechanism: yt-dlp's native fragment downloader (used
+    # for DASH/HLS formats) tracks which fragments it already has in a
+    # `<output_path>.ytdl` index file, and resumes from it independently of
+    # continuedl — an interrupted download for one URL (e.g. this process
+    # killed mid-download) leaves that index behind, and the next call for a
+    # *different* URL reusing the same output_path will silently resume from
+    # it, merging fragments from two unrelated videos into one file (wrong
+    # audio for the video, or vice versa — confirmed in production). Must be
+    # removed explicitly; there is no yt-dlp option that disables this.
+    for stray in glob.glob(f"{output_path}*.part") + glob.glob(f"{output_path}*.ytdl"):
         os.remove(stray)
 
     # --- Google Drive: use gdown instead of yt-dlp ---
