@@ -11,6 +11,7 @@ Run this file only the first time you create a token,
 or when the old token breaks / you want to re-login to the YouTube account.
 """
 
+import argparse
 import os
 
 # This library is used to run the OAuth flow for a desktop/local app.
@@ -27,48 +28,50 @@ YOUTUBE_SCOPES = [
 ]
 
 
-# OAuth Client ID file from Google Cloud Console.
-# This file is obtained from:
-# Google Cloud → APIs & Services → Credentials → OAuth client ID → Desktop app → Download JSON
-#
-# Rename the downloaded file to client_secret.json
-# then save it in the .credentials/ folder
-CLIENT_SECRET_FILE = ".credentials/client_secret.json"
-
-
-# Output token file from the Google login result.
-# This is the file that uploader.py will later read.
-TOKEN_FILE = ".credentials/youtube_token.json"
-
-
 def main():
     """
     Main function to generate the YouTube token.
 
+    Supports multi-channel: --channel <name> stores files under
+    .credentials/<name>/ instead of overwriting the same flat file every time
+    (needed once there's more than one destination channel — see
+    clipping/rights.py-style routing in autopilot.py).
+
     Flow:
     1. Check whether client_secret.json already exists.
-    2. Create the .credentials folder if it doesn't exist yet.
+    2. Create the .credentials (or .credentials/<channel>) folder if it doesn't exist yet.
     3. Open OAuth login through the browser.
     4. After the user approves, save the token to youtube_token.json.
     """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--channel", default=None,
+        help="Channel profile name (e.g. 'knowledge'). Files land in .credentials/<channel>/ "
+        "instead of flat .credentials/ — use this once you have more than one destination channel.",
+    )
+    args = parser.parse_args()
+
+    base_dir = os.path.join(".credentials", args.channel) if args.channel else ".credentials"
+    client_secret_file = os.path.join(base_dir, "client_secret.json")
+    token_file = os.path.join(base_dir, "youtube_token.json")
 
     # Check whether the client_secret.json file is available.
     # If it doesn't exist yet, the script stops because the OAuth flow can't start.
-    if not os.path.exists(CLIENT_SECRET_FILE):
+    if not os.path.exists(client_secret_file):
         raise FileNotFoundError(
-            f"{CLIENT_SECRET_FILE} not found. "
+            f"{client_secret_file} not found. "
             "Download the OAuth Client ID JSON from Google Cloud, rename it to client_secret.json, "
-            "then save it to the .credentials/ folder"
+            f"then save it to the {base_dir}/ folder"
         )
 
-    # Make sure the .credentials folder exists.
+    # Make sure the destination folder exists.
     # If it doesn't exist yet, the folder will be created automatically.
-    os.makedirs(".credentials", exist_ok=True)
+    os.makedirs(base_dir, exist_ok=True)
 
     # Build the OAuth flow from the client_secret.json file.
     # Here we pass the list of YouTube scopes/permissions needed.
     flow = InstalledAppFlow.from_client_secrets_file(
-        CLIENT_SECRET_FILE,
+        client_secret_file,
         scopes=YOUTUBE_SCOPES,
     )
 
@@ -96,10 +99,10 @@ def main():
     # IMPORTANT:
     # Do not upload youtube_token.json to GitHub.
     # Treat this file like your YouTube access password.
-    with open(TOKEN_FILE, "w", encoding="utf-8") as f:
+    with open(token_file, "w", encoding="utf-8") as f:
         f.write(creds.to_json())
 
-    print(f"✅ Token created successfully: {TOKEN_FILE}")
+    print(f"✅ Token created successfully: {token_file}")
 
 
 # This section makes main() run only when this file is executed directly:

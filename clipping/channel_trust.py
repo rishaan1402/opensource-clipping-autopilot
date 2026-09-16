@@ -410,6 +410,104 @@ def revalidate_view_counts(api_key: str, db_path: str, sample_size: int = 20) ->
     return {"kept": kept, "demoted": demoted, "failed": failed}
 
 
+def revalidate_against_harsh_metrics(
+    api_key: str,
+    db_path: str,
+    sample_size: int = 20,
+    min_views: int = 10000,
+    min_view_velocity: float = 300.0,
+    max_age_days: float = 365.0,
+) -> dict:
+    """One-time audit pass: for every currently-approved channel, check whether at
+    least one of its recently-sampled CC videos meets the same "harsh" viral bar
+    cc_supply_probe.py now applies at discovery time (--min-views /
+    --min-view-velocity / --published-after-days) — i.e., does this approved
+    channel still look like it would actually pass discovery today, not just
+    one that cleared the (looser, lifetime-average) bar it was originally
+    approved under. view_velocity = views / days-since-published, since a video
+    that slowly accumulated views over years isn't "viral" in the sense this
+    bar is trying to capture.
+
+    Demotes channels with no qualifying recent video back to REVIEW_PENDING —
+    reversible, not a block — so a human can still look and re-approve.
+    """
+    init_db(db_path)
+    approved = list_by_review_status(db_path, REVIEW_APPROVED)
+    print(
+        f"🔎 Checking {len(approved)} approved channels against harsh metrics "
+        f"(views≥{min_views:,}, velocity≥{min_view_velocity:,.0f}/day, "
+        f"published within {max_age_days:.0f}d)..."
+    )
+
+    now = datetime.now(timezone.utc)
+    passed, demoted, failed = 0, 0, 0
+    details = []
+
+    for i, ch in enumerate(approved, 1):
+        channel_id = ch["channel_id"]
+        channel_name = ch["channel_name"]
+        try:
+            uploads_playlist_id = get_or_fetch_uploads_playlist_id(api_key, db_path, channel_id)
+            if not uploads_playlist_id:
+                failed += 1
+                print(f"   ⚠️  [{i}/{len(approved)}] {channel_name}: no uploads playlist, skipped")
+                continue
+
+            video_ids = _get_recent_video_ids(api_key, uploads_playlist_id, sample_size)
+            if not video_ids:
+                failed += 1
+                print(f"   ⚠️  [{i}/{len(approved)}] {channel_name}: no uploads found, skipped")
+                continue
+
+            best_velocity = 0.0
+            best_title = None
+            for batch in _chunked(video_ids, 50):
+                resp = requests.get(
+                    VIDEOS_URL,
+                    params={"part": "status,snippet,statistics", "id": ",".join(batch), "key": api_key},
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                for item in resp.json().get("items", []):
+                    if item.get("status", {}).get("license") != "creativeCommon":
+                        continue
+                    views = int(item.get("statistics", {}).get("viewCount", 0) or 0)
+                    published_at = item.get("snippet", {}).get("publishedAt", "")
+                    try:
+                        pub_dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+                            tzinfo=timezone.utc
+                        )
+                    except ValueError:
+                        continue
+                    age_days = max((now - pub_dt).total_seconds() / 86400.0, 1.0)
+                    if age_days > max_age_days or views < min_views:
+                        continue
+                    velocity = views / age_days
+                    if velocity >= min_view_velocity and velocity > best_velocity:
+                        best_velocity = velocity
+                        best_title = item["snippet"]["title"]
+
+            if best_title:
+                passed += 1
+                print(f"   ✅ [{i}/{len(approved)}] {channel_name}: {best_velocity:,.0f}/day — {best_title[:50]}")
+                details.append({
+                    "channel_id": channel_id, "channel_name": channel_name,
+                    "status": "pass", "best_velocity": best_velocity,
+                })
+            else:
+                demoted += 1
+                print(f"   ⬇️  [{i}/{len(approved)}] {channel_name}: no recent video clears the bar — demoted to pending")
+                set_review_status(db_path, channel_id, REVIEW_PENDING)
+                details.append({"channel_id": channel_id, "channel_name": channel_name, "status": "demoted"})
+
+        except Exception as exc:  # noqa: BLE001 — surfaced, not swallowed; left as-is on failure
+            failed += 1
+            print(f"   ⚠️  [{i}/{len(approved)}] {channel_name}: check failed ({exc}), left as-is")
+
+    print(f"\nDone: {passed} pass, {demoted} demoted to pending, {failed} check failures (left as-is).")
+    return {"passed": passed, "demoted": demoted, "failed": failed, "details": details}
+
+
 def set_review_status(db_path: str, channel_id: str, review_status: str) -> None:
     if review_status not in (REVIEW_PENDING, REVIEW_APPROVED, REVIEW_BLOCKED):
         raise ValueError(f"Invalid review_status: {review_status!r}")
@@ -478,6 +576,23 @@ def _cli() -> None:
     )
     p_revalidate.add_argument("--sample-size", type=int, default=20)
 
+    p_revalidate_velocity = sub.add_parser(
+        "revalidate-velocity",
+        help="One-time audit: check every approved channel against the harsher "
+        "view-velocity/recency bar cc_supply_probe.py now applies at discovery time, "
+        "and demote (to pending, reversible) any with no recent video that clears it. "
+        "Costs ~2-3 YouTube API calls per approved channel (cached uploads-playlist "
+        "lookup keeps repeat runs cheap).",
+    )
+    p_revalidate_velocity.add_argument(
+        "--api-key", default=None,
+        help="YouTube Data API key. Defaults to the YOUTUBE_DATA_API_KEY env var.",
+    )
+    p_revalidate_velocity.add_argument("--sample-size", type=int, default=20)
+    p_revalidate_velocity.add_argument("--min-views", type=int, default=10000)
+    p_revalidate_velocity.add_argument("--min-view-velocity", type=float, default=300.0)
+    p_revalidate_velocity.add_argument("--max-age-days", type=float, default=365.0)
+
     args = p.parse_args()
 
     if args.command == "pending":
@@ -514,6 +629,16 @@ def _cli() -> None:
             print("❌ No API key — pass --api-key or set YOUTUBE_DATA_API_KEY.")
             return
         revalidate_view_counts(api_key, args.db, sample_size=args.sample_size)
+    elif args.command == "revalidate-velocity":
+        api_key = args.api_key or os.environ.get("YOUTUBE_DATA_API_KEY", "")
+        if not api_key:
+            print("❌ No API key — pass --api-key or set YOUTUBE_DATA_API_KEY.")
+            return
+        revalidate_against_harsh_metrics(
+            api_key, args.db, sample_size=args.sample_size,
+            min_views=args.min_views, min_view_velocity=args.min_view_velocity,
+            max_age_days=args.max_age_days,
+        )
 
 
 if __name__ == "__main__":

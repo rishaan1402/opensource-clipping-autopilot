@@ -217,11 +217,11 @@ def main() -> None:
     parser.add_argument("--per-channel-sample", type=int, default=50,
                          help="How many of each channel's most recent uploads to check (50 = YouTube API's max "
                          "per call, and covers full history for most small/medium channels).")
-    parser.add_argument("--channel-poll-limit", type=int, default=None,
+    parser.add_argument("--channel-poll-limit", type=int, default=50,
                          help="Only poll this many approved channels per run (oldest-polled-first rotation), "
                          "instead of all of them every time. Bounds YouTube API cost per run regardless of how "
                          "many channels are approved — full coverage still happens, spread across runs. "
-                         "Default: no limit (poll everything, every run).")
+                         "Default: 50. Pass 0 or a negative number to poll everything, every run.")
     parser.add_argument("--min-duration", type=float, default=180.0)
     parser.add_argument(
         "--from-probe-files", nargs="?", const="data/cc_supply_probe_*.json", default=None,
@@ -272,9 +272,10 @@ def main() -> None:
                 trust_db_path, data_dir, args.from_probe_files, args.min_duration
             )
         else:
+            poll_limit = args.channel_poll_limit if args.channel_poll_limit and args.channel_poll_limit > 0 else None
             candidates = find_new_candidates(
                 api_key, trust_db_path, data_dir, args.min_duration, args.per_channel_sample,
-                channel_poll_limit=args.channel_poll_limit,
+                channel_poll_limit=poll_limit,
             )
         candidates = candidates[: args.max_new]
         _process_candidates(candidates, args)

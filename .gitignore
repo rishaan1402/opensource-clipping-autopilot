@@ -45,6 +45,10 @@ data/*.lock
 # Partial/incomplete downloads
 *.part
 *.webm
+*.ytdl
+
+# Temp audio extracted for prosody/diarization scoring
+*.wav
 
 # Scheduled job logs
 logs/

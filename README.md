@@ -42,6 +42,9 @@
 | **Podcast Split-Screen** | Auto speaker diarization via **Pyannote** with top-bottom split-screen layout for podcasts (9:16). Supports **3+ speakers across multiple scenes** with per-speaker frozen frame fallback |
 | **Podcast Camera Switch** | Auto active-speaker detection with scene-aware switching — full 9:16 crop focuses on whoever is talking; blurred pillarbox only when speakers in the same scene talk simultaneously (9:16) |
 | **AI Voice-Over** | Converts auto-clips into original commentary/reaction videos using **Gemini** (script generation) and **edge-tts** (free text-to-speech), complete with audio ducking, text override, and ambient edge glow |
+| **Boundary Correction** | Verifies each AI-chosen clip's `end_time` against Whisper's word-level timestamps and extends it to finish the sentence if it would otherwise cut off mid-thought |
+| **Monetization & Payoff Scoring** | Re-ranks candidate clips by a combined score (viral score, hook strength, VVSA, retention structure, and whether the clip's transcript actually reaches a complete thought) instead of trusting the AI's raw ranking alone |
+| **Automated Channel Discovery** | Finds new Creative-Commons channels for a niche via the YouTube Data API (`cc_supply_probe.py`), scores them by view velocity (not just lifetime views), and polls approved channels for new uploads to auto-clip (`discover_new_clips.py`) |
 
 > 🎬 **NEW: Story Clip Mode (`--story-mode`)**  
 > Need to assemble a narrative from multiple specific video sources (like a brand campaign)? We've just introduced the Multi-Source Story Clip Mode!  
@@ -55,6 +58,24 @@
 - **Google Gemini API Key** ([get one here](https://aistudio.google.com/apikey))
 - **Pexels API Key** (optional, for B-roll — [get one here](https://www.pexels.com/api/))
 - **HuggingFace Token** (optional, for split-screen / camera-switch — [get one here](https://huggingface.co/settings/tokens), requires accepting [Pyannote model agreement](https://huggingface.co/pyannote/speaker-diarization-3.1))
+- **YouTube Data API Key** (optional, for channel discovery / `cc_supply_probe.py` and `--source-rights licensed_cc` re-verification — [get one here](https://console.cloud.google.com/apis/credentials), enable "YouTube Data API v3" first)
+
+> [!NOTE]
+> ### 🍎 Running locally on macOS / no NVIDIA GPU
+> This pipeline was originally built around CUDA. On a Mac (or any machine without an NVIDIA GPU), three things need adjusting:
+> 1. **Whisper needs CPU mode** — pass `--whisper-device cpu --whisper-compute-type int8` (the default `cuda`/`float16` will fail).
+> 2. **Face tracking needs YOLO, not the default MediaPipe** — pass `--face-detector yolo`. MediaPipe's GPU (Metal) delegate hard-crashes the whole process on macOS; this is documented directly in `clipping/studio/face_detection.py`.
+> 3. **Homebrew's default `ffmpeg` formula lacks subtitle/text support** — it's built without `libass`/`libfreetype`, so `drawtext`/`subtitles` filters (used for burned-in captions) fail. Install the full-featured build instead:
+>    ```bash
+>    brew uninstall ffmpeg
+>    brew tap homebrew-ffmpeg/ffmpeg
+>    brew install homebrew-ffmpeg/ffmpeg/ffmpeg
+>    ```
+>
+> Example local run:
+> ```bash
+> python main.py --url "VIDEO_URL" --whisper-device cpu --whisper-compute-type int8 --face-detector yolo
+> ```
 
 ## ☁️ Running on Google Colab (Recommended)
 
@@ -293,6 +314,8 @@ python main.py --help
 | `--gemini-model` | `gemini-3-flash-preview` | Gemini model name |
 | `--gemini-fallback-model` | `gemini-2.5-flash` | Gemini fallback model name if main model fails |
 | `--load-gemini-json` | `False` | Load the saved `gemini_response.json` from the output directory to bypass the Gemini API call |
+| `--no-boundary-correction` | — | Disable end_time correction against Whisper's word-level timestamps (see [Clip Quality: Boundary Correction](#-clip-quality-boundary-correction--payoff-scoring) below) |
+| `--max-boundary-extension` | `12.0` | Max seconds `end_time` may be extended by boundary correction to finish a sentence |
 | `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |
 | `--dynamic-split` | `False` | Automatically switch between full-screen and split-screen based on activity (requires `--split-screen`) |
 | `--split-trigger` | `diarization` | Trigger for splitting: `diarization` (audio-based) or `face` (visual count) |
@@ -565,6 +588,9 @@ GEMINI_MODEL = "gemini-2.0-flash"
 ```text
 opensource-clipping/
 ├── main.py                  # CLI entry point
+├── autopilot.py             # Clip + upload in one command
+├── discover_new_clips.py    # Poll approved channels for new uploads to auto-clip
+├── cc_supply_probe.py       # Find new Creative-Commons channels for a niche
 ├── run_upload.py            # YouTube auto-uploader CLI
 ├── run_fb_upload.py         # Facebook Pages Reels uploader CLI
 ├── pyproject.toml           # Dependencies & metadata
@@ -577,7 +603,9 @@ opensource-clipping/
 │   ├── engine.py            # Download → Transcribe → Gemini AI
 │   ├── diarization.py       # Pyannote speaker diarization
 │   ├── metadata.py          # QA metadata normalization
+│   ├── channel_trust.py     # Channel-level CC trust review (approve/block/pending)
 │   ├── runner.py            # Pipeline orchestrator
+│   ├── phase1/              # Semantic dedup, prosody/visual/monetization scoring, boundary correction, QC
 │   ├── story/               # Story mode modules
 │   └── studio/              # Video render engine modules
 ├── facebook_uploader/       # Facebook Pages Reels upload & scheduling
@@ -680,6 +708,65 @@ python run_fb_upload.py --help
 | `--tz-name` | `Asia/Makassar` | Timezone for scheduling (IANA format) |
 | `--interval-hours` | `5` | Gap between scheduled uploads (hours) |
 | `--test-mode` | `false` | Upload only the first video |
+
+## ✂️ Clip Quality: Boundary Correction & Payoff Scoring
+
+Two quality checks run automatically as part of the normal pipeline (`main.py` / `runner.py`), on top of the AI's own clip selection:
+
+### Boundary Correction
+The Gemini prompt already asks the AI not to cut a clip before a thought finishes — but nothing verified that. **Boundary correction** checks each candidate's `end_time` against Whisper's word-level timestamps:
+- If `end_time` lands mid-word or before the last sentence's terminal punctuation (`. ! ?`), it searches forward for the next sentence-ending word and extends `end_time` just past it — bounded by `--max-boundary-extension` (default 12s) and the pipeline's own clip-duration ceiling.
+- If it can't be fixed within those bounds, `end_time` is left alone but the clip is tagged `boundary_issue` in `clip_candidates.json` / `render_manifest.json` instead of silently shipping a bad cut.
+- Disable with `--no-boundary-correction`.
+
+### Payoff / Completeness Scoring
+`clipping/phase1/monetization.py`'s `has_natural_payoff()` checks whether a candidate's transcript text actually lands on a complete thought (ends on terminal punctuation, doesn't trail off on a dangling conjunction like "and"/"so"/"because") — this feeds into `structure_score` / `combined_score`, so clips that end awkwardly rank lower instead of scoring identically to clips with a real payoff. Visible per-clip as `monetization.has_payoff` in `clip_candidates.json`.
+
+## 🔍 Automated Channel Discovery & Autopilot
+
+For running this as a hands-off content pipeline — finding channels in a niche, polling them for new uploads, and clipping + uploading automatically — three scripts work together:
+
+```
+cc_supply_probe.py ──► clipping/channel_trust.py ──► discover_new_clips.py ──► autopilot.py
+  (find channels          (one-time human review         (poll approved         (clip + upload,
+   for a niche)             of trusted channels)           channels for            one command)
+                                                            new uploads)
+```
+
+### 1. Find channels for a niche (`cc_supply_probe.py`)
+Searches YouTube for Creative-Commons-licensed videos matching your keywords, re-verifies each video's license, and checks whether each channel releases CC content *systematically* (not just one CC-tagged video) via `clipping/channel_trust.py`.
+
+```bash
+python cc_supply_probe.py --keywords "psychology facts" "history explained" \
+  --min-views 10000 --min-view-velocity 300 --published-after-days 365
+```
+- `--min-views` / `--min-view-velocity` / `--published-after-days` make the search harsher — biasing toward content that's actually breaking out now (`view_count / days_since_published`), not old videos that slowly accumulated views over years.
+- Channels meeting a high bar (≥10 CC videos, ≥70% CC ratio, ≥30k avg views, no red-flag keywords) are auto-approved; everything else lands in a review queue.
+
+### 2. Review & approve channels (`clipping/channel_trust.py`)
+```bash
+python -m clipping.channel_trust pending              # list channels awaiting a one-time human decision
+python -m clipping.channel_trust approve <channel_id> # approve — its CC content can now auto-publish
+python -m clipping.channel_trust block <channel_id>   # block — never auto-publish
+
+# Periodic re-audits (both demote to pending, not block — reversible):
+python -m clipping.channel_trust revalidate-views      # re-check avg view count against the approval bar
+python -m clipping.channel_trust revalidate-velocity    # re-check against the harsher view-velocity/recency bar
+```
+
+### 3. Poll approved channels for new uploads (`discover_new_clips.py`)
+```bash
+python discover_new_clips.py --max-new 3 --clips 5 --upload-youtube \
+  --whisper-device cpu --whisper-compute-type int8 --face-detector yolo
+```
+- Polls a rotating batch of approved channels (`--channel-poll-limit`, default 50 per run — oldest-polled-first, so full coverage happens over several runs instead of hammering the API every time), finds videos not yet processed, re-verifies each one's license fresh, and hands qualifying ones to `autopilot.py` one at a time.
+- `--dry-run` lists candidates without processing them.
+
+### 4. Clip + upload in one command (`autopilot.py`)
+```bash
+python autopilot.py --url "VIDEO_URL" --clips 5 --upload-youtube --upload-facebook
+```
+Runs the normal clipping pipeline, then automatically feeds the resulting `render_manifest.json` into `run_upload.py` / `run_fb_upload.py`. Any flag `main.py` accepts (e.g. `--whisper-device cpu --face-detector yolo`) can be passed through. `--skip-clip --manifest-file outputs/render_manifest.json` re-runs just the upload stage against an existing manifest.
 
 ## 🧹 Disk Cleanup
 

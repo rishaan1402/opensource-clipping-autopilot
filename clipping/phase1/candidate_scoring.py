@@ -31,12 +31,23 @@ def extract_candidate_text(clip: Dict, segment_data: List[Dict]) -> str:
     """
     Build transcript text for a candidate's [start_time, end_time] window.
 
-    Reuses the exact overlap + text-join pattern already used for the
-    voice-over script step in clipping/runner.py (lines ~190-198): a segment
-    is included if it overlaps the window at all (segment end > window start
-    AND segment start < window end), not only if fully contained. Supports
-    both Whisper-style segments (`text` key) and YouTube JSON3 segments
-    (`words: [{word: ...}, ...]`, no top-level `text`).
+    A segment is considered if it overlaps the window at all (segment end >
+    window start AND segment start < window end), not only if fully
+    contained — same pattern as the voice-over script step in
+    clipping/runner.py (lines ~190-198). Supports both Whisper-style
+    segments (`text` key) and YouTube JSON3 segments (`words: [{word: ...},
+    ...]`, no top-level `text`).
+
+    When a segment carries word-level timestamps (`words`, each with its own
+    `start`/`end` — Whisper's chunks group up to `max_words_per_subtitle`
+    words per segment, so a chunk can span past the window on either side),
+    text is trimmed to only the words that individually overlap [start,
+    end] rather than the whole chunk. This matters for anything checking
+    the *last* word of the window (e.g. monetization.has_natural_payoff) —
+    without trimming, a clip whose end_time lands mid-chunk would score
+    against words the render never actually includes. Segments with only a
+    top-level `text` (no per-word timestamps, e.g. some subtitle sources)
+    fall back to including the segment whole, same as before.
 
     Args:
         clip: Candidate dict with 'start_time' / 'end_time' keys.
@@ -52,12 +63,30 @@ def extract_candidate_text(clip: Dict, segment_data: List[Dict]) -> str:
     for seg in segment_data:
         seg_end = float(seg.get("end", 0.0))
         seg_start = float(seg.get("start", 0.0))
-        if seg_end > start and seg_start < end:
-            seg_text = seg.get("text") or " ".join(
-                w["word"] for w in seg.get("words", [])
+        if seg_end <= start or seg_start >= end:
+            continue
+
+        words = seg.get("words")
+        has_word_timestamps = bool(words) and "start" in words[0] and "end" in words[0]
+        if has_word_timestamps:
+            # Midpoint containment, not "any overlap" — a boundary-correction
+            # padding of a fraction of a second after the true last word can
+            # otherwise clip the very next word's start (near-zero gaps are
+            # normal in continuous speech), pulling extra, never-rendered
+            # words into the scored text.
+            seg_text = " ".join(
+                w["word"] for w in words
+                if start <= (float(w["start"]) + float(w["end"])) / 2 < end
             )
-            if seg_text:
-                lines.append(seg_text)
+        elif words:
+            # No per-word timestamps to trim against (e.g. YouTube JSON3) —
+            # the segment-level overlap check above already gated inclusion.
+            seg_text = " ".join(w["word"] for w in words)
+        else:
+            seg_text = seg.get("text", "")
+
+        if seg_text:
+            lines.append(seg_text)
 
     return " ".join(lines).strip()
 
@@ -169,6 +198,7 @@ def score_candidates(
             "series_potential": metrics.series_potential,
             "has_face": metrics.has_face,
             "has_motion": metrics.has_motion,
+            "has_payoff": metrics.has_payoff,
             "recommendations": metrics.recommendations,
         }
         clip["combined_score"] = (

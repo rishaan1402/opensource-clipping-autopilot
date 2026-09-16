@@ -567,6 +567,25 @@ def _build_parser() -> argparse.ArgumentParser:
         help="SigLIP model name (transformers-compatible) used for zero-shot visual-interest scoring.",
     )
 
+    # --- Boundary Correction ---
+    boundary_group = p.add_argument_group("Boundary Correction")
+    boundary_group.add_argument(
+        "--no-boundary-correction",
+        action="store_true",
+        default=False,
+        help="Disable end_time correction against Whisper's word-level timestamps. Normally, "
+        "if a clip's end_time cuts off mid-word or mid-sentence, this extends it to the next "
+        "sentence-ending word (bounded by --max-boundary-extension and the clip duration "
+        "ceiling); if it can't be fixed within those bounds, the clip is tagged with a "
+        "'boundary_issue' field instead of silently shipping the bad cut.",
+    )
+    boundary_group.add_argument(
+        "--max-boundary-extension",
+        type=float,
+        default=12.0,
+        help="Max seconds end_time may be extended by boundary correction to finish a sentence.",
+    )
+
     # --- Semantic Dedup (BGE) ---
     dedup_group = p.add_argument_group("Semantic Dedup")
     dedup_group.add_argument(
@@ -1146,6 +1165,9 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         # Visual Scoring
         enable_visual_scoring=not args.no_visual_scoring,
         siglip_model=args.siglip_model,
+        # Boundary Correction
+        enable_boundary_correction=not args.no_boundary_correction,
+        max_boundary_extension=args.max_boundary_extension,
         # Semantic Dedup
         enable_semantic_dedup=not args.no_semantic_dedup,
         semantic_dedup_threshold=args.semantic_dedup_threshold,

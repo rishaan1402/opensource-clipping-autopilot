@@ -175,6 +175,25 @@ def run_pipeline(cfg) -> list[dict]:
 
     # Step 4 — Metadata normalisation
     result_json = metadata.normalize_and_validate(result_json)
+
+    # Step 4.1 — Boundary correction: check the AI's chosen end_time (and,
+    # lightly, start_time) against Whisper's word-level timestamps so clips
+    # don't end mid-sentence. Runs before dedup/scoring below so their
+    # transcript-text extraction reflects the corrected window, not the
+    # AI's raw one.
+    if getattr(cfg, "enable_boundary_correction", True) and segment_data:
+        from .phase1.boundary_correction import correct_clip_boundaries
+
+        try:
+            result_json = correct_clip_boundaries(
+                result_json,
+                segment_data,
+                max_duration=getattr(cfg, "max_clip_duration", engine.MAX_CLIP_DURATION),
+                max_extension_seconds=getattr(cfg, "max_boundary_extension", 12.0),
+            )
+        except Exception as e:
+            print(f"⚠️ Boundary correction failed: {e}. Continuing with AI-chosen timestamps as-is.")
+
     metadata.print_preview(result_json)
 
     metadata_path = os.path.join(cfg.outputs_dir, "metadata_preview.json")

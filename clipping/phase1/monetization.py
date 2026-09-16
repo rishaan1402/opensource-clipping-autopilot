@@ -32,6 +32,7 @@ class MonetizationMetrics:
     recommendations: List[str]
     has_face: Optional[bool] = None  # None = unknown (no detector run)
     has_motion: Optional[bool] = None  # None = unknown (no detector run)
+    has_payoff: Optional[bool] = None  # Does the transcript text end on a complete thought?
 
 
 class HookStrengthDetector:
@@ -187,6 +188,41 @@ class VVSAPredictor:
         return min(1.0, max(0.0, score))
 
 
+_TERMINAL_CHARS = ".!?"
+_TRAILING_STRIP_CHARS = "\"'”’)]"
+_DANGLING_LAST_WORDS = {
+    "and", "but", "or", "so", "because", "since", "although", "though",
+    "which", "that", "who", "the", "a", "an", "to", "of", "in", "for",
+    "with", "is", "are", "was", "were", "if", "when", "while", "as", "its",
+    "his", "her", "their", "our", "my", "your",
+}
+
+
+def has_natural_payoff(text: str) -> bool:
+    """
+    Heuristic: does this clip's transcript text land on a complete thought
+    rather than trailing off mid-sentence?
+
+    Two cheap signals, both must pass — text-only (no audio), since this
+    runs on the AI-selected candidate's transcript window, same as the rest
+    of MonetizationScorer:
+      - Ends on terminal punctuation (. ! ?), not a comma or nothing.
+        Faster-Whisper punctuates from prosody/pauses, so this catches most
+        genuine mid-sentence cuts.
+      - The last word itself isn't a conjunction/article/preposition that
+        implies the sentence continues — catches audio that was cut off
+        before Whisper had a chance to punctuate it at all.
+    """
+    trailing = (text or "").strip().rstrip(_TRAILING_STRIP_CHARS)
+    if not trailing or trailing[-1] not in _TERMINAL_CHARS:
+        return False
+
+    words = re.findall(r"[A-Za-z']+", trailing)
+    if not words:
+        return False
+    return words[-1].lower() not in _DANGLING_LAST_WORDS
+
+
 class RetentionCurveOptimizer:
     """Optimizes clip structure for retention (avg view duration)."""
 
@@ -245,7 +281,11 @@ class RetentionCurveOptimizer:
             end = seg.get('end', 0)
             duration = end - start
 
-            structure_score = cls.predict_retention(duration, has_good_hook=True, has_payoff=True)
+            structure_score = cls.predict_retention(
+                duration,
+                has_good_hook=True,
+                has_payoff=has_natural_payoff(seg.get('text', '')),
+            )
             scores[i] = structure_score
 
         return scores
@@ -398,7 +438,10 @@ class MonetizationScorer:
         retention_score = RetentionCurveOptimizer.predict_retention(duration, has_good_hook=hook_score > 0.6)
 
         optimal_len, len_reason = OptimalLengthCalculator.calculate_optimal_length(duration)
-        structure_score = RetentionCurveOptimizer.predict_retention(duration, has_good_hook=True, has_payoff=True)
+        payoff = has_natural_payoff(text)
+        structure_score = RetentionCurveOptimizer.predict_retention(
+            duration, has_good_hook=hook_score > 0.6, has_payoff=payoff
+        )
 
         series_potential, series_type = SeriesDetector.detect_series_potential(text)
 
@@ -413,6 +456,10 @@ class MonetizationScorer:
 
         # Recommendations
         recommendations = []
+        if not payoff:
+            recommendations.append(
+                "⚠ Clip may end mid-sentence or without a clear payoff — check end_time"
+            )
         if hook_score < 0.6:
             recommendations.append(f"⚠ Weak hook: {hook_reason}")
         if vvsa_score < 0.7:
@@ -439,6 +486,7 @@ class MonetizationScorer:
             recommendations=recommendations,
             has_face=has_face,
             has_motion=has_motion,
+            has_payoff=payoff,
         )
 
     @classmethod
