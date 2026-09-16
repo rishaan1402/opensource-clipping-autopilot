@@ -521,7 +521,13 @@ WAIT_INCREMENT_SECONDS = 30
 NVIDIA_MAX_ATTEMPTS = 3
 NVIDIA_INITIAL_WAIT_SECONDS = 15
 NVIDIA_WAIT_INCREMENT_SECONDS = 15
-REQUEST_TIMEOUT_MS = 15 * 60 * 1000  # 15 menit
+REQUEST_TIMEOUT_MS = 15 * 60 * 1000  # 15 minutes
+
+# Local vLLM server retry budget: no rate limits to worry about (it's our own GPU),
+# so attempts are cheap — this mainly covers the server still warming up / loading weights.
+LOCAL_MAX_ATTEMPTS = 3
+LOCAL_INITIAL_WAIT_SECONDS = 10
+LOCAL_WAIT_INCREMENT_SECONDS = 10
 RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
 
 
@@ -1303,6 +1309,86 @@ def analyze_with_groq(full_transcript: str, cfg) -> list[dict]:
     return result
 
 
+def analyze_with_local(full_transcript: str, cfg) -> list[dict]:
+    """Analyze transcript using a local vLLM server (OpenAI-compatible API).
+
+    Meant for a self-hosted open-weight model — e.g. Qwen2.5-32B-Instruct-AWQ served
+    via `vllm serve <model> --tensor-parallel-size 2 --dtype float16` across Kaggle's
+    dual-T4 GPUs. No API key or rate limits; the only real failure modes are the
+    server not being up yet or the model not supporting guided JSON decoding.
+    """
+    from openai import OpenAI
+
+    print(f"[3/3] Analyzing Top {cfg.clip_count} moments using local vLLM ({cfg.local_model})...")
+
+    client = OpenAI(
+        base_url=cfg.local_base_url,
+        # vLLM's OpenAI-compatible server doesn't check this by default, but the
+        # OpenAI client requires a non-empty string.
+        api_key="not-needed",
+    )
+
+    prompt = get_analysis_prompt(full_transcript, cfg.clip_count, cfg.hook_duration, cfg=cfg)
+
+    # vLLM exposes the same guided-decoding mechanism NVIDIA's NIM API used to (before
+    # it was dropped there) via extra_body["guided_json"] — the model is physically
+    # constrained to emit only tokens matching this schema, so this is load-bearing for
+    # getting a small/medium open-weight model to reliably fill every required field,
+    # not just a suggestion in the prompt text.
+    guided_schema = {
+        "type": "object",
+        "properties": {"clips": _build_clips_schema()},
+        "required": ["clips"],
+    }
+
+    last_exc = None
+    completion = None
+    for attempt in range(1, LOCAL_MAX_ATTEMPTS + 1):
+        try:
+            print(f"[Local] Attempt {attempt}/{LOCAL_MAX_ATTEMPTS}...")
+            completion = client.chat.completions.create(
+                model=cfg.local_model,
+                messages=[
+                    {"role": "system", "content": "You are a professional video editor and strategist. Return JSON only. Follow the provided JSON schema exactly."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.5,
+                top_p=1,
+                max_tokens=16384,
+                extra_body={"guided_json": guided_schema},
+            )
+            break
+        except Exception as exc:
+            last_exc = exc
+            print(f"[Local] Attempt {attempt}/{LOCAL_MAX_ATTEMPTS} failed | error={exc}")
+            if attempt == LOCAL_MAX_ATTEMPTS:
+                raise
+            wait_seconds = LOCAL_INITIAL_WAIT_SECONDS + ((attempt - 1) * LOCAL_WAIT_INCREMENT_SECONDS)
+            print(f"[Local] Retrying in {wait_seconds}s...")
+            time.sleep(wait_seconds)
+
+    content = completion.choices[0].message.content
+
+    if "```" in content:
+        content = re.sub(r"```(json)?", "", content).strip()
+        content = content.split("```")[0].strip()
+
+    result = json.loads(content)
+
+    if isinstance(result, dict):
+        for key in ["clips", "data", "highlights"]:
+            if key in result and isinstance(result[key], list):
+                result = result[key]
+                break
+
+    if not isinstance(result, list):
+        if isinstance(result, dict):
+            return [result]
+        raise ValueError(f"Local provider returned a non-list/dict format: {type(result)}")
+
+    return result
+
+
 _TRANSCRIPT_TIMESTAMP_RE = re.compile(r"\[\s*[\d.]+\s*-\s*([\d.]+)\s*\]")
 
 
@@ -1323,6 +1409,12 @@ def _estimate_transcript_duration_seconds(full_transcript: str) -> float:
 def analyze_with_ai(full_transcript: str, cfg) -> list[dict]:
     """Dispatcher for AI analysis based on provider."""
     provider = getattr(cfg, "ai_provider", "gemini")
+
+    if provider == "local":
+        try:
+            return analyze_with_local(full_transcript, cfg)
+        except Exception as e:
+            print(f"⚠️ Local vLLM provider failed: {e}. Falling back to Gemini...")
 
     if provider == "nvidia":
         if not cfg.api_key_nvidia:

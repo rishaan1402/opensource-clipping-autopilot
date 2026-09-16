@@ -245,12 +245,14 @@ def main() -> None:
     parser.add_argument("--youtube-no-approval", action="store_true", help="Pass through to autopilot.py.")
     parser.add_argument("--gemini-model", default=None, help="Pass through to autopilot.py / clipping.config.")
     parser.add_argument("--gemini-fallback-model", default=None, help="Pass through to autopilot.py / clipping.config.")
-    parser.add_argument("--ai-provider", default=None, choices=["gemini", "nvidia", "groq"],
+    parser.add_argument("--ai-provider", default=None, choices=["gemini", "nvidia", "groq", "local"],
                          help="Pass through to autopilot.py / clipping.config.")
     parser.add_argument("--nvidia-model", default=None, help="Pass through to autopilot.py / clipping.config.")
     parser.add_argument("--groq-model", default=None, help="Pass through to autopilot.py / clipping.config.")
     parser.add_argument("--groq-max-duration-seconds", type=int, default=None,
                          help="Pass through to autopilot.py / clipping.config.")
+    parser.add_argument("--local-model", default=None, help="Pass through to autopilot.py / clipping.config.")
+    parser.add_argument("--local-base-url", default=None, help="Pass through to autopilot.py / clipping.config.")
     args = parser.parse_args()
 
     api_key = os.environ.get("YOUTUBE_DATA_API_KEY", "")
@@ -327,6 +329,10 @@ def _process_candidates(candidates: list[dict], args) -> None:
             cmd += ["--groq-model", args.groq_model]
         if args.groq_max_duration_seconds is not None:
             cmd += ["--groq-max-duration-seconds", str(args.groq_max_duration_seconds)]
+        if args.local_model is not None:
+            cmd += ["--local-model", args.local_model]
+        if args.local_base_url is not None:
+            cmd += ["--local-base-url", args.local_base_url]
 
         result = subprocess.run(cmd)
         if result.returncode != 0:

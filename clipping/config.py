@@ -166,6 +166,11 @@ GROQ_MAX_VIDEO_DURATION_SECONDS = 600
 GEMINI_MODEL = "gemini-3-flash-preview"
 GEMINI_FALLBACK_MODEL = "gemini-3.6-flash"
 
+# Local model served via vLLM's OpenAI-compatible API (e.g. on Kaggle's dual-T4 GPUs).
+# AWQ quantization + tensor_parallel_size=2 lets a 32B-class model fit across both 16GB T4s.
+LOCAL_MODEL = "Qwen/Qwen2.5-32B-Instruct-AWQ"
+LOCAL_BASE_URL = "http://localhost:8000/v1"
+
 
 # ==============================================================================
 # CLI PARSER
@@ -434,9 +439,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--ai-provider",
-        choices=["gemini", "nvidia", "groq"],
+        choices=["gemini", "nvidia", "groq", "local"],
         default=AI_PROVIDER,
-        help="AI provider for video analysis (gemini, nvidia, or groq).",
+        help="AI provider for video analysis (gemini, nvidia, groq, or local).",
     )
     p.add_argument(
         "--nvidia-model",
@@ -463,6 +468,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "to Gemini instead of skipping the video outright. Off by default — while Gemini's own "
         "free-tier daily quota is also exhausted, falling back just burns a guaranteed-fail "
         "10-attempt retry cycle per video instead of cleanly skipping to the next candidate.",
+    )
+    p.add_argument(
+        "--local-model",
+        default=LOCAL_MODEL,
+        help="Model name/path served by the local vLLM OpenAI-compatible server "
+        "(e.g. Qwen/Qwen2.5-32B-Instruct-AWQ). Must match what the vLLM server was started with.",
+    )
+    p.add_argument(
+        "--local-base-url",
+        default=LOCAL_BASE_URL,
+        help="Base URL of the local vLLM OpenAI-compatible server.",
     )
     p.add_argument("--gemini-model", default=GEMINI_MODEL, help="Gemini model name")
     p.add_argument(
@@ -1035,6 +1051,8 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         groq_model=args.groq_model,
         groq_max_duration_seconds=args.groq_max_duration_seconds,
         groq_oversized_fallback_gemini=args.groq_oversized_fallback_gemini,
+        local_model=args.local_model,
+        local_base_url=args.local_base_url,
         gemini_model=args.gemini_model,
         gemini_fallback_model=args.gemini_fallback_model,
         load_gemini_json=args.load_gemini_json,
