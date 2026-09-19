@@ -190,11 +190,13 @@ class VVSAPredictor:
 
 _TERMINAL_CHARS = ".!?"
 _TRAILING_STRIP_CHARS = "\"'”’)]"
+# Only words that cannot grammatically end a sentence. Words that can
+# ("that" in "instead of that.", "so", "to", "in", "is", "her") are excluded —
+# this check runs after terminal punctuation is already required, so listing
+# them only produces false positives on complete sentences.
 _DANGLING_LAST_WORDS = {
-    "and", "but", "or", "so", "because", "since", "although", "though",
-    "which", "that", "who", "the", "a", "an", "to", "of", "in", "for",
-    "with", "is", "are", "was", "were", "if", "when", "while", "as", "its",
-    "his", "her", "their", "our", "my", "your",
+    "and", "but", "or", "because", "although", "though", "which",
+    "the", "a", "an", "if", "when", "while", "its", "their", "our", "my", "your",
 }
 
 
