@@ -657,6 +657,16 @@ MAX_CLIP_DURATION = 179
 
 def get_analysis_prompt(full_transcript: str, clip_count: int, hook_duration: int, cfg=None) -> str:
     """Centralized prompt for both Gemini and NVIDIA providers."""
+    # Optional operator steer (--clip-focus): lets a run prefer or avoid a kind of
+    # moment (e.g. spoken interview over live music) without editing the prompt.
+    _focus_prompt = ""
+    _focus = getattr(cfg, "clip_focus", None) if cfg else None
+    if _focus:
+        _focus_prompt = (
+            "\n\nOPERATOR DIRECTION (applies when choosing which moments to select):\n"
+            f"- {_focus}\n"
+        )
+
     # Build optional Hook V2 prompt section
     _hook_v2_prompt = ""
     if cfg and getattr(cfg, "hook_v2", False):
@@ -960,7 +970,7 @@ OUTPUT RULES:
 - Don't give any explanation outside the JSON.
 - All fields are required.
 - If in doubt, prioritize accuracy to the clip's content over excessive creativity.
-{_hook_v2_prompt}{_segment_prompt}
+{_hook_v2_prompt}{_segment_prompt}{_focus_prompt}
 
 REQUIRED JSON STRUCTURE (follow these field names exactly):
 [

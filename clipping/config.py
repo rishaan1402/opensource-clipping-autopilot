@@ -255,6 +255,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Number of highlight clips to generate",
     )
     p.add_argument(
+        "--clip-focus",
+        default=None,
+        help="Free-text direction added to the clip-selection prompt, e.g. 'Prefer spoken "
+        "interview moments; avoid live musical performances' or 'Do not select these time "
+        "ranges: ...'. Steers which moments are picked; does not change how they are cut.",
+    )
+    p.add_argument(
         "--ratio",
         "-r",
         default=PILIHAN_RASIO,
@@ -1143,6 +1150,7 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         whisper_compute_type=args.whisper_compute_type,
         # AI
         ai_provider=args.ai_provider,
+        clip_focus=args.clip_focus,
         api_key_nvidia=os.environ.get("NVIDIA_API_KEY", ""),
         nvidia_model=args.nvidia_model,
         api_key_groq=os.environ.get("GROQ_API_KEY", ""),

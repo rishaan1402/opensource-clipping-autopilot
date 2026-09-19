@@ -59,3 +59,6 @@ node_modules/
 # OS
 .DS_Store
 .claude/
+
+# Saved per-video clip sets (copied out of outputs/ so later runs do not overwrite them)
+saved_runs/

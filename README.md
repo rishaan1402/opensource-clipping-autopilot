@@ -316,6 +316,7 @@ python main.py --help
 | `--load-gemini-json` | `False` | Load the saved `gemini_response.json` from the output directory to bypass the Gemini API call |
 | `--no-boundary-correction` | — | Disable end_time correction against Whisper's word-level timestamps (see [Clip Quality: Boundary Correction](#-clip-quality-boundary-correction--payoff-scoring) below) |
 | `--max-boundary-extension` | `12.0` | Max seconds `end_time` may be extended by boundary correction to finish a sentence |
+| `--clip-focus` | `None` | Free-text direction added to the clip-selection prompt (e.g. `"Prefer spoken interview moments; avoid live musical performances"`, or a list of time ranges not to reuse). Steers which moments are picked, not how they're cut. To re-select on an already-transcribed video, clear the `ai_analysis` and `render_clip_*` steps from `outputs/.checkpoints/pipeline_state.json` first, otherwise the checkpoint reuses the old rendered clips. |
 | `--split-screen` | `False` | Enable split-screen mode for podcasts (9:16 only, requires `HF_TOKEN`). Supports 3+ speakers across multiple scenes |
 | `--dynamic-split` | `False` | Automatically switch between full-screen and split-screen based on activity (requires `--split-screen`) |
 | `--split-trigger` | `diarization` | Trigger for splitting: `diarization` (audio-based) or `face` (visual count) |
