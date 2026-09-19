@@ -457,7 +457,18 @@ def transcribe_video(
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
 
     print("      ⏳ Decoding audio & extracting features (no output yet)...", flush=True)
-    segments, info = model.transcribe(video_path, beam_size=5, word_timestamps=True)
+    # condition_on_previous_text=False + vad_filter=True: on long recordings with
+    # long non-speech stretches (music, performances), the default lets one blank
+    # or hallucinated stretch poison the context and the model then skips real
+    # speech for the rest of the file — a 1h53m stream came back with only ~18
+    # minutes transcribed while the audio was loud, clear English at minute 100.
+    segments, info = model.transcribe(
+        video_path,
+        beam_size=5,
+        word_timestamps=True,
+        condition_on_previous_text=False,
+        vad_filter=True,
+    )
 
     full_transcript = ""
     segment_data: list[dict] = []
