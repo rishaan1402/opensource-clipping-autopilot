@@ -88,14 +88,17 @@ class TestBuildMonetizationInput(unittest.TestCase):
     """Test the adapter shape builder."""
 
     def test_shape_has_exact_keys(self):
-        """Returns exactly {'text', 'start', 'end'}."""
+        """Returns exactly {'text', 'start', 'end', 'has_face', 'has_motion'}."""
         clip = {"start_time": 10.0, "end_time": 40.0}
         segment_data = [{"start": 10.0, "end": 40.0, "text": "Stop doing this"}]
         result = build_monetization_input(clip, segment_data)
-        self.assertEqual(set(result.keys()), {"text", "start", "end"})
+        self.assertEqual(set(result.keys()), {"text", "start", "end", "has_face", "has_motion"})
         self.assertIsInstance(result["text"], str)
         self.assertIsInstance(result["start"], float)
         self.assertIsInstance(result["end"], float)
+        # No probe ran for this candidate -> unknown (None), not confirmed-absent (False).
+        self.assertIsNone(result["has_face"])
+        self.assertIsNone(result["has_motion"])
 
     def test_start_end_match_candidate_times(self):
         clip = {"start_time": 12.5, "end_time": 44.5}
