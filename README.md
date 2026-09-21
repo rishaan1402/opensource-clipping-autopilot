@@ -2,8 +2,6 @@
 
 Turns long videos into short-form clips, and can run unattended. It finds Creative Commons videos from channels you have reviewed, verifies each license, picks the best moments with an LLM plus audio and visual signals, renders vertical clips with face-tracked framing and burned-in captions, and uploads them to YouTube (or Facebook Reels) on a schedule.
 
-It is built on top of [NaufalRizqullah/opensource-clipping](https://github.com/NaufalRizqullah/opensource-clipping) (MIT). See [Credits and license](#17-credits-and-license).
-
 ## Contents
 
 1. [What you can do](#1-what-you-can-do)
@@ -1138,6 +1136,8 @@ The tests cover the selection-quality and bookkeeping modules under `clipping/ph
 ---
 
 ## 17. Credits and license
+
+It is built on top of [NaufalRizqullah/opensource-clipping](https://github.com/NaufalRizqullah/opensource-clipping) (MIT). See [Credits and license](#17-credits-and-license).
 
 Released under the MIT License; see [`LICENSE`](LICENSE). The license and its copyright notice must stay with the code.
 
