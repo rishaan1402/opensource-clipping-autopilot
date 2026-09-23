@@ -668,6 +668,24 @@ MAX_CLIP_DURATION = 179
 
 def get_analysis_prompt(full_transcript: str, clip_count: int, hook_duration: int, cfg=None) -> str:
     """Centralized prompt for both Gemini and NVIDIA providers."""
+    # Duration override (--min-clip-duration/--max-clip-duration): the base prompt below is
+    # written for short punchy Shorts, and free-text --clip-focus steering alone was found NOT
+    # to be enough to make the model pick longer clips — it still defaulted to 30-60s clips
+    # when just told to "prefer 90-170 second segments". Actually changing the stated numeric
+    # range, plus an explicit minimum-length rule, is what actually moves the output.
+    _min_dur = getattr(cfg, "min_clip_duration", None) if cfg else None
+    _max_dur = getattr(cfg, "max_clip_duration", None) if cfg else None
+    _min_dur = _min_dur if _min_dur else MIN_CLIP_DURATION
+    _max_dur = _max_dur if _max_dur else MAX_CLIP_DURATION
+    _min_length_rule = ""
+    if _min_dur > MIN_CLIP_DURATION:
+        _min_length_rule = (
+            f"\n- Each clip MUST be AT LEAST {_min_dur} seconds long. A clip shorter than "
+            f"{_min_dur}s is a FAILED output for this run, even if it feels tight and punchy — "
+            "extend it to include more of the surrounding explanation, example, or argument "
+            "rather than cutting early."
+        )
+
     # Optional operator steer (--clip-focus): lets a run prefer or avoid a kind of
     # moment (e.g. spoken interview over live music) without editing the prompt.
     _focus_prompt = ""
@@ -726,7 +744,7 @@ MAIN TASK:
 - All output must be highly relevant to the clip's content, not the full video's content in general.
 
 CLIP SELECTION & VIRAL-ABILITY RULES:
-- Clip duration must be {MIN_CLIP_DURATION}-{MAX_CLIP_DURATION} seconds.
+- Clip duration must be {_min_dur}-{_max_dur} seconds.{_min_length_rule}
 - Look for moments containing one (or a combination — the more the stronger) of these patterns — these are the patterns that most often drive share/comment/watch-through on short-form:
   1. Curiosity gap — a question/tension that makes viewers HAVE to know the answer before scrolling on.
   2. Bold claim / controversial opinion — a bold statement that provokes agreement/disagreement.
@@ -776,7 +794,7 @@ TIMING-CUT RULES:
 - Don't cut too early if a sentence is still hanging.
 - Don't continue the clip too long after the core message is done.
 - The clip must remain understandable without watching the parts before or after it.
-- If two strong moments are very close together and reinforce each other, they may be merged as long as duration stays within {MIN_CLIP_DURATION}-{MAX_CLIP_DURATION} seconds.
+- If two strong moments are very close together and reinforce each other, they may be merged as long as duration stays within {_min_dur}-{_max_dur} seconds.
 - If two strong moments have different angles, separate them as different clip candidates.
 
 INTERNAL VIRAL_SCORE ASSESSMENT:

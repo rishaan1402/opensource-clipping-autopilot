@@ -262,6 +262,36 @@ def _build_parser() -> argparse.ArgumentParser:
         "ranges: ...'. Steers which moments are picked; does not change how they are cut.",
     )
     p.add_argument(
+        "--min-clip-duration",
+        type=int,
+        default=None,
+        help="Override the minimum clip duration told to the AI (seconds). Default: 20 "
+        "(engine.MIN_CLIP_DURATION). --clip-focus text alone ('prefer long clips') was found "
+        "NOT to reliably change output length — use this to actually move it.",
+    )
+    p.add_argument(
+        "--max-clip-duration",
+        type=int,
+        default=None,
+        help="Override the maximum clip duration told to the AI (seconds). Default: 179 "
+        "(engine.MAX_CLIP_DURATION) — YouTube Shorts' own ceiling. Raise this for 16:9 "
+        "long-form output where the Shorts limit doesn't apply.",
+    )
+    p.add_argument(
+        "--summary",
+        action="store_true",
+        default=False,
+        help="Build ONE chronological summary edit of the whole video (context, key points, "
+        "conclusion) instead of independent clips. Always renders 16:9. Reuses the download and "
+        "cached transcript; --clip-focus steers what it covers.",
+    )
+    p.add_argument(
+        "--summary-minutes",
+        type=float,
+        default=5.5,
+        help="Target length of the --summary edit in minutes (default: 5.5).",
+    )
+    p.add_argument(
         "--ratio",
         "-r",
         default=PILIHAN_RASIO,
@@ -1151,6 +1181,10 @@ def build_config(argv: list[str] | None = None) -> SimpleNamespace:
         # AI
         ai_provider=args.ai_provider,
         clip_focus=args.clip_focus,
+        min_clip_duration=args.min_clip_duration,
+        max_clip_duration=args.max_clip_duration,
+        summary=args.summary,
+        summary_minutes=args.summary_minutes,
         api_key_nvidia=os.environ.get("NVIDIA_API_KEY", ""),
         nvidia_model=args.nvidia_model,
         api_key_groq=os.environ.get("GROQ_API_KEY", ""),
